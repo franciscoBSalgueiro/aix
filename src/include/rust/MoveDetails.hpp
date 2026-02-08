@@ -33,6 +33,7 @@ inline diplomat::capi::MoveDetails MoveDetails::AsFFI() const {
     /* .promotion = */ promotion,
     /* .is_check = */ is_check,
     /* .is_checkmate = */ is_checkmate,
+    /* .is_stalemate = */ is_stalemate,
     /* .is_en_passant = */ is_en_passant,
   };
 }
@@ -48,6 +49,7 @@ inline MoveDetails MoveDetails::FromFFI(diplomat::capi::MoveDetails c_struct) {
     /* .promotion = */ c_struct.promotion,
     /* .is_check = */ c_struct.is_check,
     /* .is_checkmate = */ c_struct.is_checkmate,
+    /* .is_stalemate = */ c_struct.is_stalemate,
     /* .is_en_passant = */ c_struct.is_en_passant,
   };
 }

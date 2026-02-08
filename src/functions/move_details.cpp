@@ -19,7 +19,8 @@ const int CAPTURE_I = 5;
 const int IS_CASTLE_I = 6;
 const int CHECK_I = 7;
 const int CHECKMATE_I = 8;
-const int IS_EN_PASSANT_I = 9;
+const int STALEMATE_I = 9;
+const int IS_EN_PASSANT_I = 10;
 
 template <bool NULLABLE>
 struct MoveDetailsStruct {
@@ -47,6 +48,7 @@ struct MoveDetailsStruct {
 		FlatVector::GetData<bool>(*entries[IS_CASTLE_I])[i] = value.inner.is_castle;
 		FlatVector::GetData<bool>(*entries[CHECK_I])[i] = value.inner.is_check;
 		FlatVector::GetData<bool>(*entries[CHECKMATE_I])[i] = value.inner.is_checkmate;
+		FlatVector::GetData<bool>(*entries[STALEMATE_I])[i] = value.inner.is_stalemate;
 		FlatVector::GetData<bool>(*entries[IS_EN_PASSANT_I])[i] = value.inner.is_en_passant;
 	}
 }; // namespace
@@ -104,6 +106,7 @@ void Register_MoveDetails(ExtensionLoader &loader) {
 	move_children.push_back(std::make_pair("is_castle", LogicalType::BOOLEAN));
 	move_children.push_back(std::make_pair("is_check", LogicalType::BOOLEAN));
 	move_children.push_back(std::make_pair("is_checkmate", LogicalType::BOOLEAN));
+	move_children.push_back(std::make_pair("is_stalemate", LogicalType::BOOLEAN));
 	move_children.push_back(std::make_pair("is_en_passant", LogicalType::BOOLEAN));
 
 	auto move_details_function = ScalarFunction("move_details", {LogicalType::BLOB},

@@ -86,6 +86,7 @@ mod ffi {
         pub promotion: i8,
         pub is_check: bool,
         pub is_checkmate: bool,
+        pub is_stalemate: bool,
         pub is_en_passant: bool,
     }
 

@@ -178,8 +178,12 @@ pub fn move_details_iterator<'a>(
                 let role = m.role().char() as i8;
                 let ply = ply as u16;
 
-                let is_check = pos.is_check();
-                let is_checkmate = pos.is_checkmate();
+                let checkers = pos.checkers();
+                let no_legal_moves = pos.legal_moves().is_empty();
+
+                let is_check = checkers.any();
+                let is_checkmate = is_check && no_legal_moves;
+                let is_stalemate = !is_check && no_legal_moves;
 
                 let is_en_passant = m.is_en_passant();
 
@@ -193,6 +197,7 @@ pub fn move_details_iterator<'a>(
                     promotion,
                     is_check,
                     is_checkmate,
+                    is_stalemate,
                     is_en_passant,
                 }
             })
