@@ -1,29 +1,67 @@
-use super::{decode_bytes, decode_bytes_positions};
-use crate::board_into_bitboards;
 use crate::ffi::{Bitboards, Game, MoveDetails};
 use aix_chess_compression::{Decode, Decoder, EncodedGame};
 use diplomat_runtime::DiplomatWrite;
 use shakmaty::fen::Fen;
-use shakmaty::{Chess, Color, EnPassantMode, Position, Setup};
+use shakmaty::{Board, Chess, Color, EnPassantMode, Position};
 use std::fmt::Write;
 
-pub fn pieces_at_position(data: &[u8], pos: i32) -> Result<Bitboards, crate::ffi::DecodeError> {
-    let positions = decode_bytes_positions(data)?;
+fn board_into_bitboards(board: &Board) -> Bitboards {
+    let white = board.white();
+    let black = board.black();
+    let kings = board.kings();
+    let queens = board.queens();
+    let rooks = board.rooks();
+    let bishops = board.bishops();
+    let knights = board.knights();
+    let pawns = board.pawns();
+    Bitboards {
+        w_k: (white & kings).0,
+        w_q: (white & queens).0,
+        w_r: (white & rooks).0,
+        w_b: (white & bishops).0,
+        w_n: (white & knights).0,
+        w_p: (white & pawns).0,
+        b_k: (black & kings).0,
+        b_q: (black & queens).0,
+        b_r: (black & rooks).0,
+        b_b: (black & bishops).0,
+        b_n: (black & knights).0,
+        b_p: (black & pawns).0,
+    }
+}
 
-    let index = if pos >= 0 {
-        pos
-    } else {
-        positions.len() as i32 + pos + 1
-    };
+fn chess_at_position(data: &[u8], pos: i32) -> Result<Option<Chess>, crate::ffi::DecodeError> {
+    let game = EncodedGame::from_bytes(data)?;
 
-    if index < 0 || index as usize > positions.len() {
-        Err(crate::ffi::DecodeError::NoErrorNoValue)
+    if pos == 0 {
+        return Ok(Some(Chess::new()));
+    }
+
+    let decoder = Decoder::new(&game);
+    let mut pos_iter = decoder.into_iter_positions();
+
+    if pos > 0 {
+        pos_iter
+            .nth((pos - 1) as usize)
+            .transpose()
+            .map_err(|e| e.into())
     } else {
-        Ok(if index == 0 {
-            board_into_bitboards(&Chess::new().board())
+        let mut positions = pos_iter.collect::<Result<Vec<_>, _>>()?;
+        let index = positions.len() as i32 + pos;
+        if index < 0 {
+            Ok(None)
         } else {
-            board_into_bitboards(positions[index as usize - 1].board())
-        })
+            Ok(Some(positions.swap_remove(index as usize)))
+        }
+    }
+}
+
+pub fn pieces_at_position(data: &[u8], pos: i32) -> Result<Bitboards, crate::ffi::DecodeError> {
+    let maybe_chess = chess_at_position(data, pos)?;
+    if let Some(chess) = maybe_chess {
+        Ok(board_into_bitboards(&chess.board()))
+    } else {
+        Err(crate::ffi::DecodeError::NoErrorNoValue)
     }
 }
 
@@ -32,33 +70,16 @@ pub fn board_at_position(
     pos: i32,
     out: &mut [i8],
 ) -> Result<(), crate::ffi::DecodeError> {
-    let positions_result = decode_bytes(data).map(|(_, p)| p);
-
-    positions_result.and_then(|positions| {
-        let index = if pos >= 0 {
-            pos
-        } else {
-            positions.len() as i32 + pos + 1
-        };
-
-        if index < 0 || index as usize > positions.len() {
-            Err(crate::ffi::DecodeError::NoErrorNoValue)
-        } else {
-            let setup = if index == 0 {
-                Setup::default()
-            } else {
-                positions[index as usize - 1]
-                    .clone()
-                    .to_setup(EnPassantMode::Always)
-            };
-
-            for (sq, p) in setup.board {
-                out[sq as usize] = p.char() as i8;
-            }
-
-            Ok(())
+    let maybe_chess = chess_at_position(data, pos)?;
+    if let Some(chess) = maybe_chess {
+        let setup = chess.to_setup(EnPassantMode::Always);
+        for (sq, p) in setup.board {
+            out[sq as usize] = p.char() as i8;
         }
-    })
+        Ok(())
+    } else {
+        return Err(crate::ffi::DecodeError::NoErrorNoValue);
+    }
 }
 
 pub fn fen_at_position(
@@ -66,29 +87,14 @@ pub fn fen_at_position(
     pos: i32,
     out: &mut DiplomatWrite,
 ) -> Result<(), crate::ffi::DecodeError> {
-    let positions_result = decode_bytes(data).map(|(_, p)| p);
-
-    positions_result.and_then(|positions| {
-        let index = if pos >= 0 {
-            pos
-        } else {
-            positions.len() as i32 + pos + 1
-        };
-
-        if index < 0 || index as usize > positions.len() {
-            Err(crate::ffi::DecodeError::NoErrorNoValue)
-        } else {
-            let fen = if index == 0 {
-                let pos = Chess::default();
-                Fen::from_position(&pos, EnPassantMode::Always)
-            } else {
-                Fen::from_position(&positions[index as usize - 1], EnPassantMode::Always)
-            }
-            .to_string();
-            write!(out, "{fen}").expect("fen_at_position: write to DiplomatWrite failed");
-            Ok(())
-        }
-    })
+    let maybe_chess = chess_at_position(data, pos)?;
+    if let Some(chess) = maybe_chess {
+        let fen = Fen::from_position(&chess, EnPassantMode::Always);
+        write!(out, "{fen}").expect("fen_at_position: write to DiplomatWrite failed");
+        Ok(())
+    } else {
+        return Err(crate::ffi::DecodeError::NoErrorNoValue);
+    }
 }
 
 pub fn to_uci_string(data: &[u8], out: &mut DiplomatWrite) -> Result<(), crate::ffi::DecodeError> {

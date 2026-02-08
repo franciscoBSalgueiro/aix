@@ -1,52 +1,8 @@
-use aix_chess_compression::{CompressionLevel, Decode, Decoder, EncodedGame};
-use ffi::Bitboards;
-use shakmaty::{Board, Chess, Move};
+use aix_chess_compression::CompressionLevel;
 
 mod game;
 mod scoutfish;
 mod subfen;
-
-fn decode_bytes(bytes: &[u8]) -> Result<(Vec<Move>, Vec<Chess>), ffi::DecodeError> {
-    let encoded = EncodedGame::from_bytes(bytes).unwrap();
-    let decoder = Decoder::new(&encoded);
-    decoder
-        .decode_all_moves_and_positions()
-        .map_err(|e| e.into())
-}
-
-fn decode_bytes_positions(bytes: &[u8]) -> Result<Vec<Chess>, crate::ffi::DecodeError> {
-    let encoded = EncodedGame::from_bytes(bytes)?;
-    let decoder = Decoder::new(&encoded);
-    let result = decoder
-        .into_iter_positions()
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(result)
-}
-
-fn board_into_bitboards(board: &Board) -> Bitboards {
-    let white = board.white();
-    let black = board.black();
-    let kings = board.kings();
-    let queens = board.queens();
-    let rooks = board.rooks();
-    let bishops = board.bishops();
-    let knights = board.knights();
-    let pawns = board.pawns();
-    Bitboards {
-        w_k: (white & kings).0,
-        w_q: (white & queens).0,
-        w_r: (white & rooks).0,
-        w_b: (white & bishops).0,
-        w_n: (white & knights).0,
-        w_p: (white & pawns).0,
-        b_k: (black & kings).0,
-        b_q: (black & queens).0,
-        b_r: (black & rooks).0,
-        b_b: (black & bishops).0,
-        b_n: (black & knights).0,
-        b_p: (black & pawns).0,
-    }
-}
 
 const LEVELS: [CompressionLevel; 3] = [
     CompressionLevel::Low,
