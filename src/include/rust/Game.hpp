@@ -45,6 +45,8 @@ namespace capi {
     
     diplomat::capi::MoveDetailsIterator* Game_move_details_iterator(const diplomat::capi::Game* self);
     
+    bool Game_is_valid_movedata(diplomat::capi::DiplomatU8View data);
+    
     
     void Game_destroy(Game* self);
     
@@ -113,6 +115,11 @@ inline diplomat::result<size_t, DecodeError> Game::recompress(diplomat::span<con
 inline std::unique_ptr<MoveDetailsIterator> Game::move_details_iterator() const {
   auto result = diplomat::capi::Game_move_details_iterator(this->AsFFI());
   return std::unique_ptr<MoveDetailsIterator>(MoveDetailsIterator::FromFFI(result));
+}
+
+inline bool Game::is_valid_movedata(diplomat::span<const uint8_t> data) {
+  auto result = diplomat::capi::Game_is_valid_movedata({data.data(), data.size()});
+  return result;
 }
 
 inline const diplomat::capi::Game* Game::AsFFI() const {

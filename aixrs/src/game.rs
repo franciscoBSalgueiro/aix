@@ -125,6 +125,16 @@ pub fn moved_pieces(data: &[u8], out: &mut DiplomatWrite) -> Result<(), crate::f
     Ok(())
 }
 
+pub fn is_valid_movedata(data: &[u8]) -> bool {
+    match EncodedGame::from_bytes(data) {
+        Ok(encoded_game) => {
+            let decoder = Decoder::new(&encoded_game);
+            decoder.into_iter_moves().all(|m| m.is_ok())
+        }
+        Err(_) => false,
+    }
+}
+
 pub fn from_bytes(data: &'_ [u8]) -> Result<Box<Game<'_>>, crate::ffi::DecodeError> {
     Ok(Box::new(Game(EncodedGame::from_bytes(data)?)))
 }

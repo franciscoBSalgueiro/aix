@@ -42,6 +42,8 @@ public:
 
   inline std::unique_ptr<MoveDetailsIterator> move_details_iterator() const;
 
+  inline static bool is_valid_movedata(diplomat::span<const uint8_t> data);
+
   inline const diplomat::capi::Game* AsFFI() const;
   inline diplomat::capi::Game* AsFFI();
   inline static const Game* FromFFI(const diplomat::capi::Game* ptr);

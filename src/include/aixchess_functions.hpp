@@ -33,6 +33,7 @@ void Register_ToPgn(ExtensionLoader &loader);
 void Register_MovedPieces(ExtensionLoader &loader);
 void Register_MoveDetails(ExtensionLoader &loader);
 void Register_Recompress(ExtensionLoader &loader);
+void Register_IsValidMovedata(ExtensionLoader &loader);
 
 template <typename T>
 T UnwrapDecoded(diplomat::result<T, DecodeError> &&result, const char *function_name) {

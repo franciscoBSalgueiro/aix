@@ -43,6 +43,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	Register_MovedPieces(loader);
 	Register_MoveDetails(loader);
 	Register_Recompress(loader);
+	Register_IsValidMovedata(loader);
 
 	// Macros
 	for (idx_t index = 0; aixchess_macros[index].name != nullptr; index++) {

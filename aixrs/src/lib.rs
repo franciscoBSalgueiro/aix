@@ -191,6 +191,10 @@ mod ffi {
                 crate::game::move_details_iterator(&self.0),
             )))
         }
+
+        pub fn is_valid_movedata(data: &[u8]) -> bool {
+            crate::game::is_valid_movedata(data)
+        }
     }
 
     impl<'a> MoveDetailsIterator<'a> {

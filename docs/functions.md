@@ -39,6 +39,13 @@ Use `list_eval_to_centipawns` or `list_eval_to_mate` to apply these functions to
 Returns the FEN at a given position. The starting position is 0. Negative integers are accepted, the final position is -1.
 
 
+## is_valid_movedata
+
+`is_valid_movedata(movedata BLOB) -> BOOLEAN`
+
+Returns true if `movedata` represents a valid chess game, false otherwise.
+
+
 ## matches_subfen
 
 `matches_subfen(movedata BLOB, subfen VARCHAR) -> BOOLEAN`
