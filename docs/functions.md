@@ -6,7 +6,9 @@ The Aix extension provides several scalar functions in DuckDB that can be applie
 
 `board_at_position(movedata BLOB, position INTEGER) -> STRUCT(a1 VARCHAR, b1 VARCHAR, c1 VARCHAR, ..., h8 VARCHAR)`
 
-Returns the board at a given position as a struct. The starting position is 0. Negative integers are accepted, the final position is -1.
+Returns the board at a given position as a struct. The starting position is 0, so the final position is `ply_count`.
+
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count - N + 1`.
 
 
 ## clocks_to_move_times
@@ -36,7 +38,9 @@ Use `list_eval_to_centipawns` or `list_eval_to_mate` to apply these functions to
 
 `fen_at_position(movedata BLOB, position INTEGER) -> VARCHAR`
 
-Returns the FEN at a given position. The starting position is 0. Negative integers are accepted, the final position is -1.
+Returns the FEN at a given position. The starting position is 0, so the final position is `ply_count`.
+
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count - N + 1`.
 
 
 ## is_valid_movedata
@@ -68,7 +72,7 @@ Returns a list of details of all moves in the game. Note that lists in DuckDB ar
 
 Returns the details of a given move in the game. This function is 0-indexed, so the first move is `move_details_at(..., 0)`. This also means that `move_details_at(..., x) = move_details(...)[x + 1]`.
 
-Negative indices are accepted, the last move is -1.
+Negative indices are accepted, the last move is -1. However, it is faster to pass a positive index based on the `ply_count` column, if available: `-N` is equal to `ply_count - N`.
 
 
 ## moved_pieces
@@ -89,14 +93,18 @@ Returns the moved pieces in order as a list, e.g. `[P, p, B, n, N, p, K, n, P, b
 
 `piece_counts_at_position(movedata BLOB, position INTEGER) -> STRUCT(wK UTINYINT, wQ UTINYINT, wR UTINYINT, wB UTINYINT, wN UTINYINT, wP UTINYINT, bK UTINYINT, bQ UTINYINT, bR UTINYINT, bB UTINYINT, bN UTINYINT, bP UTINYINT)`
 
-Returns the piece counts at a given position. The starting position is 0. Negative integers are accepted, the final position is -1.
+Returns the piece counts at a given position. The starting position is 0, so the final position is `ply_count`.
+
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count - N + 1`.
 
 
 ## pieces_at_position
 
 `pieces_at_position(movedata BLOB, position INTEGER) -> STRUCT(wK VARCHAR, wQ VARCHAR[], wR VARCHAR[], wB VARCHAR[], wN VARCHAR[], wP VARCHAR[], bK VARCHAR, bQ VARCHAR[], bR VARCHAR[], bB VARCHAR[], bN VARCHAR[], bP VARCHAR[])`
 
-Returns the squares where the pieces are on at a given position. The starting position is 0. Negative integers are accepted, the final position is -1.
+Returns the squares where the pieces are on at a given position. The starting position is 0, so the final position is `ply_count`.
+
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count - N + 1`.
 
 
 ## recompress
