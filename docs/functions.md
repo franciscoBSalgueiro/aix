@@ -62,6 +62,7 @@ and matches if a position contains at least those pieces.
 ## move_details(_full)
 
 `move_details(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN,  is_en_passant BOOLEAN)[]`
+
 `move_details_full(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN)[]`
 
 Returns a list of details of all moves in the game. Note that lists in DuckDB are 1-indexed, so the first move is `move_details(...)[1]`.
@@ -72,6 +73,7 @@ Returns a list of details of all moves in the game. Note that lists in DuckDB ar
 ## move_details(_full)_at
 
 `move_details_at(movedata BLOB, index SMALLINT) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN)`
+
 `move_details_full_at(movedata BLOB, index SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN)`
 
 Returns the details of a given move in the game. This function is 0-indexed, so the first move is `move_details_at(..., 0)`. This also means that `move_details_at(..., x) = move_details(...)[x + 1]`.
