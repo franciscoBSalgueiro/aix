@@ -1,5 +1,5 @@
-#ifndef MoveDetailsLight_D_HPP
-#define MoveDetailsLight_D_HPP
+#ifndef MoveDetailsFull_D_HPP
+#define MoveDetailsFull_D_HPP
 
 #include <stdio.h>
 #include <stdint.h>
@@ -12,7 +12,7 @@
 
 namespace diplomat {
 namespace capi {
-    struct MoveDetailsLight {
+    struct MoveDetailsFull {
       uint16_t ply;
       int8_t role;
       uint8_t from;
@@ -20,15 +20,18 @@ namespace capi {
       int8_t capture;
       bool is_castle;
       int8_t promotion;
+      bool is_check;
+      bool is_checkmate;
+      bool is_stalemate;
       bool is_en_passant;
     };
     
-    typedef struct MoveDetailsLight_option {union { MoveDetailsLight ok; }; bool is_ok; } MoveDetailsLight_option;
+    typedef struct MoveDetailsFull_option {union { MoveDetailsFull ok; }; bool is_ok; } MoveDetailsFull_option;
 } // namespace capi
 } // namespace
 
 
-struct MoveDetailsLight {
+struct MoveDetailsFull {
   uint16_t ply;
   int8_t role;
   uint8_t from;
@@ -36,11 +39,14 @@ struct MoveDetailsLight {
   int8_t capture;
   bool is_castle;
   int8_t promotion;
+  bool is_check;
+  bool is_checkmate;
+  bool is_stalemate;
   bool is_en_passant;
 
-  inline diplomat::capi::MoveDetailsLight AsFFI() const;
-  inline static MoveDetailsLight FromFFI(diplomat::capi::MoveDetailsLight c_struct);
+  inline diplomat::capi::MoveDetailsFull AsFFI() const;
+  inline static MoveDetailsFull FromFFI(diplomat::capi::MoveDetailsFull c_struct);
 };
 
 
-#endif // MoveDetailsLight_D_HPP
+#endif // MoveDetailsFull_D_HPP

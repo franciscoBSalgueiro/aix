@@ -1,4 +1,4 @@
-use crate::ffi::{Bitboards, Game, MoveDetails, MoveDetailsLight};
+use crate::ffi::{Bitboards, Game, MoveDetailsFull, MoveDetails};
 use aix_chess_compression::{Decode, Decoder, EncodedGame};
 use diplomat_runtime::DiplomatWrite;
 use shakmaty::fen::Fen;
@@ -152,7 +152,7 @@ fn castling_king_dest(king: shakmaty::Square, rook: shakmaty::Square) -> shakmat
 
 pub fn move_details_iterator<'a>(
     encoded: &'a EncodedGame,
-) -> impl Iterator<Item = Result<MoveDetails, crate::ffi::DecodeError>> + 'a {
+) -> impl Iterator<Item = Result<MoveDetailsFull, crate::ffi::DecodeError>> + 'a {
     let decoder = Decoder::new(encoded);
     decoder
         .into_iter_moves_and_positions()
@@ -187,7 +187,7 @@ pub fn move_details_iterator<'a>(
 
                 let is_en_passant = m.is_en_passant();
 
-                MoveDetails {
+                MoveDetailsFull {
                     ply,
                     role,
                     from,
@@ -207,7 +207,7 @@ pub fn move_details_iterator<'a>(
 
 pub fn move_details_light_iterator<'a>(
     encoded: &'a EncodedGame,
-) -> impl Iterator<Item = Result<MoveDetailsLight, crate::ffi::DecodeError>> + 'a {
+) -> impl Iterator<Item = Result<MoveDetails, crate::ffi::DecodeError>> + 'a {
     let decoder = Decoder::new(encoded);
     decoder.into_iter_moves().enumerate().map(|(ply, r)| {
         r.map(|m| {
@@ -232,7 +232,7 @@ pub fn move_details_light_iterator<'a>(
 
             let is_en_passant = m.is_en_passant();
 
-            MoveDetailsLight {
+            MoveDetails {
                 ply,
                 role,
                 from,

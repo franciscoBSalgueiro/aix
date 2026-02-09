@@ -10,9 +10,9 @@
 #include "rust/ScoutfishQuery.hpp"
 #include "rust/ScoutfishQueryParseError.hpp"
 #include "rust/MoveDetails.hpp"
-#include "rust/MoveDetailsLight.hpp"
+#include "rust/MoveDetailsFull.hpp"
 #include "rust/MoveDetailsIterator.hpp"
-#include "rust/MoveDetailsLightIterator.hpp"
+#include "rust/MoveDetailsFullIterator.hpp"
 #include "rust/DecodeError.hpp"
 #include "rust/diplomat_runtime.hpp"
 

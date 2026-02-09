@@ -1,7 +1,7 @@
-#ifndef MoveDetailsLight_HPP
-#define MoveDetailsLight_HPP
+#ifndef MoveDetailsFull_HPP
+#define MoveDetailsFull_HPP
 
-#include "MoveDetailsLight.d.hpp"
+#include "MoveDetailsFull.d.hpp"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -22,8 +22,8 @@ namespace capi {
 } // namespace
 
 
-inline diplomat::capi::MoveDetailsLight MoveDetailsLight::AsFFI() const {
-  return diplomat::capi::MoveDetailsLight {
+inline diplomat::capi::MoveDetailsFull MoveDetailsFull::AsFFI() const {
+  return diplomat::capi::MoveDetailsFull {
     /* .ply = */ ply,
     /* .role = */ role,
     /* .from = */ from,
@@ -31,12 +31,15 @@ inline diplomat::capi::MoveDetailsLight MoveDetailsLight::AsFFI() const {
     /* .capture = */ capture,
     /* .is_castle = */ is_castle,
     /* .promotion = */ promotion,
+    /* .is_check = */ is_check,
+    /* .is_checkmate = */ is_checkmate,
+    /* .is_stalemate = */ is_stalemate,
     /* .is_en_passant = */ is_en_passant,
   };
 }
 
-inline MoveDetailsLight MoveDetailsLight::FromFFI(diplomat::capi::MoveDetailsLight c_struct) {
-  return MoveDetailsLight {
+inline MoveDetailsFull MoveDetailsFull::FromFFI(diplomat::capi::MoveDetailsFull c_struct) {
+  return MoveDetailsFull {
     /* .ply = */ c_struct.ply,
     /* .role = */ c_struct.role,
     /* .from = */ c_struct.from,
@@ -44,9 +47,12 @@ inline MoveDetailsLight MoveDetailsLight::FromFFI(diplomat::capi::MoveDetailsLig
     /* .capture = */ c_struct.capture,
     /* .is_castle = */ c_struct.is_castle,
     /* .promotion = */ c_struct.promotion,
+    /* .is_check = */ c_struct.is_check,
+    /* .is_checkmate = */ c_struct.is_checkmate,
+    /* .is_stalemate = */ c_struct.is_stalemate,
     /* .is_en_passant = */ c_struct.is_en_passant,
   };
 }
 
 
-#endif // MoveDetailsLight_HPP
+#endif // MoveDetailsFull_HPP

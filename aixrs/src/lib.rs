@@ -76,7 +76,7 @@ mod ffi {
         pub b_p: u64,
     }
 
-    pub struct MoveDetails {
+    pub struct MoveDetailsFull {
         pub ply: u16,
         pub role: i8,
         pub from: u8,
@@ -90,7 +90,7 @@ mod ffi {
         pub is_en_passant: bool,
     }
 
-    pub struct MoveDetailsLight {
+    pub struct MoveDetails {
         pub ply: u16,
         pub role: i8,
         pub from: u8,
@@ -113,13 +113,13 @@ mod ffi {
     pub struct Game<'a>(pub EncodedGame<'a>);
 
     #[diplomat::opaque]
-    pub struct MoveDetailsIterator<'a>(
-        pub Box<dyn Iterator<Item = Result<MoveDetails, DecodeError>> + 'a>,
+    pub struct MoveDetailsFullIterator<'a>(
+        pub Box<dyn Iterator<Item = Result<MoveDetailsFull, DecodeError>> + 'a>,
     );
 
     #[diplomat::opaque]
-    pub struct MoveDetailsLightIterator<'a>(
-        pub Box<dyn Iterator<Item = Result<MoveDetailsLight, DecodeError>> + 'a>,
+    pub struct MoveDetailsIterator<'a>(
+        pub Box<dyn Iterator<Item = Result<MoveDetails, DecodeError>> + 'a>,
     );
 
     impl<'a> Game<'a> {
@@ -159,20 +159,44 @@ mod ffi {
             Ok(written)
         }
 
-        pub fn move_details_iterator(&'a self) -> Box<MoveDetailsIterator<'a>> {
-            Box::new(MoveDetailsIterator::<'a>(Box::new(
+        pub fn move_details_full_iterator(&'a self) -> Box<MoveDetailsFullIterator<'a>> {
+            Box::new(MoveDetailsFullIterator::<'a>(Box::new(
                 crate::game::move_details_iterator(&self.0),
             )))
         }
 
-        pub fn move_details_light_iterator(&'a self) -> Box<MoveDetailsLightIterator<'a>> {
-            Box::new(MoveDetailsLightIterator::<'a>(Box::new(
+        pub fn move_details_iterator(&'a self) -> Box<MoveDetailsIterator<'a>> {
+            Box::new(MoveDetailsIterator::<'a>(Box::new(
                 crate::game::move_details_light_iterator(&self.0),
             )))
         }
 
         pub fn is_valid_movedata(data: &[u8]) -> bool {
             crate::game::is_valid_movedata(data)
+        }
+    }
+
+    impl<'a> MoveDetailsFullIterator<'a> {
+        pub fn next(&mut self) -> Result<MoveDetailsFull, DecodeError> {
+            crate::optional_result_to_result(self.0.next())
+        }
+
+        pub fn nth(&mut self, n: i16) -> Result<MoveDetailsFull, DecodeError> {
+            if n >= 0 {
+                crate::optional_result_to_result(self.0.nth(n as usize))
+            } else {
+                let mut collected = self
+                    .0
+                    .by_ref()
+                    .collect::<Result<Vec<MoveDetailsFull>, DecodeError>>()?;
+                let i = collected.len() as i16 + n;
+                if i >= 0 {
+                    let result = collected.swap_remove(i as usize);
+                    Ok(result)
+                } else {
+                    Err(DecodeError::NoErrorNoValue)
+                }
+            }
         }
     }
 
@@ -189,30 +213,6 @@ mod ffi {
                     .0
                     .by_ref()
                     .collect::<Result<Vec<MoveDetails>, DecodeError>>()?;
-                let i = collected.len() as i16 + n;
-                if i >= 0 {
-                    let result = collected.swap_remove(i as usize);
-                    Ok(result)
-                } else {
-                    Err(DecodeError::NoErrorNoValue)
-                }
-            }
-        }
-    }
-
-    impl<'a> MoveDetailsLightIterator<'a> {
-        pub fn next(&mut self) -> Result<MoveDetailsLight, DecodeError> {
-            crate::optional_result_to_result(self.0.next())
-        }
-
-        pub fn nth(&mut self, n: i16) -> Result<MoveDetailsLight, DecodeError> {
-            if n >= 0 {
-                crate::optional_result_to_result(self.0.nth(n as usize))
-            } else {
-                let mut collected = self
-                    .0
-                    .by_ref()
-                    .collect::<Result<Vec<MoveDetailsLight>, DecodeError>>()?;
                 let i = collected.len() as i16 + n;
                 if i >= 0 {
                     let result = collected.swap_remove(i as usize);

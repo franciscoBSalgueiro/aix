@@ -20,9 +20,6 @@ namespace capi {
       int8_t capture;
       bool is_castle;
       int8_t promotion;
-      bool is_check;
-      bool is_checkmate;
-      bool is_stalemate;
       bool is_en_passant;
     };
     
@@ -39,9 +36,6 @@ struct MoveDetails {
   int8_t capture;
   bool is_castle;
   int8_t promotion;
-  bool is_check;
-  bool is_checkmate;
-  bool is_stalemate;
   bool is_en_passant;
 
   inline diplomat::capi::MoveDetails AsFFI() const;
