@@ -17,14 +17,14 @@ const int TO_I = 3;
 const int PROMOTION_I = 4;
 const int CAPTURE_I = 5;
 const int IS_CASTLE_I = 6;
-const int CHECK_I = 7;
-const int CHECKMATE_I = 8;
-const int STALEMATE_I = 9;
-const int IS_EN_PASSANT_I = 10;
+const int IS_EN_PASSANT_I = 7;
+const int CHECK_I = 8;
+const int CHECKMATE_I = 9;
+const int STALEMATE_I = 10;
 
-template <bool NULLABLE>
+template <bool NULLABLE, typename INNER_TYPE>
 struct MoveDetailsStruct {
-	MoveDetails inner;
+	INNER_TYPE inner;
 	bool valid = true;
 
 	static void AssignResult(Vector &result, idx_t i, MoveDetailsStruct value) {
@@ -46,24 +46,49 @@ struct MoveDetailsStruct {
 		FlatVector::GetData<string_t>(*entries[CAPTURE_I])[i] =
 		    value.inner.capture == 0 ? "" : std::string(1, value.inner.capture);
 		FlatVector::GetData<bool>(*entries[IS_CASTLE_I])[i] = value.inner.is_castle;
-		FlatVector::GetData<bool>(*entries[CHECK_I])[i] = value.inner.is_check;
-		FlatVector::GetData<bool>(*entries[CHECKMATE_I])[i] = value.inner.is_checkmate;
-		FlatVector::GetData<bool>(*entries[STALEMATE_I])[i] = value.inner.is_stalemate;
 		FlatVector::GetData<bool>(*entries[IS_EN_PASSANT_I])[i] = value.inner.is_en_passant;
+		if constexpr (std::is_same_v<INNER_TYPE, MoveDetails>) {
+			FlatVector::GetData<bool>(*entries[CHECK_I])[i] = value.inner.is_check;
+			FlatVector::GetData<bool>(*entries[CHECKMATE_I])[i] = value.inner.is_checkmate;
+			FlatVector::GetData<bool>(*entries[STALEMATE_I])[i] = value.inner.is_stalemate;
+		}
 	}
 }; // namespace
 
 inline void MoveDetailsFn(DataChunk &args, ExpressionState &state, Vector &result) {
-	GenericExecutor::ExecuteUnary<PrimitiveType<string_t>, GenericListType<MoveDetailsStruct<false>>>(
+	const char *func_name = "move_details";
+
+	GenericExecutor::ExecuteUnary<PrimitiveType<string_t>, GenericListType<MoveDetailsStruct<false, MoveDetails>>>(
 	    args.data[0], result, args.size(), [&](PrimitiveType<string_t> game) {
 		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
 
 		    auto game_obj_result = Game::from_bytes(data);
-		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), "move_details");
+		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
 		    auto iter = game_obj->move_details_iterator();
-		    GenericListType<MoveDetailsStruct<false>> moves;
-		    while (auto opt = UnwrapOptionalDecoded(iter->next(), "move_details")) {
-			    MoveDetailsStruct<false> move;
+		    GenericListType<MoveDetailsStruct<false, MoveDetails>> moves;
+		    while (auto opt = UnwrapOptionalDecoded(iter->next(), func_name)) {
+			    MoveDetailsStruct<false, MoveDetails> move;
+			    move.inner = *opt;
+			    moves.values.push_back(move);
+		    }
+
+		    return moves;
+	    });
+}
+
+inline void MoveDetailsLightFn(DataChunk &args, ExpressionState &state, Vector &result) {
+	const char *func_name = "move_details_light";
+
+	GenericExecutor::ExecuteUnary<PrimitiveType<string_t>, GenericListType<MoveDetailsStruct<false, MoveDetailsLight>>>(
+	    args.data[0], result, args.size(), [&](PrimitiveType<string_t> game) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+
+		    auto game_obj_result = Game::from_bytes(data);
+		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		    auto iter = game_obj->move_details_light_iterator();
+		    GenericListType<MoveDetailsStruct<false, MoveDetailsLight>> moves;
+		    while (auto opt = UnwrapOptionalDecoded(iter->next(), func_name)) {
+			    MoveDetailsStruct<false, MoveDetailsLight> move;
 			    move.inner = *opt;
 			    moves.values.push_back(move);
 		    }
@@ -73,17 +98,44 @@ inline void MoveDetailsFn(DataChunk &args, ExpressionState &state, Vector &resul
 }
 
 inline void MoveDetailsAtFn(DataChunk &args, ExpressionState &state, Vector &result) {
-	GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<int16_t>, MoveDetailsStruct<true>>(
+	const char *func_name = "move_details_at";
+
+	GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<int16_t>,
+	                               MoveDetailsStruct<true, MoveDetails>>(
 	    args.data[0], args.data[1], result, args.size(), [&](PrimitiveType<string_t> game, PrimitiveType<int16_t> ply) {
 		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
 
 		    auto game_obj_result = Game::from_bytes(data);
-		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), "move_details_at");
+		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
 		    auto iter = game_obj->move_details_iterator();
 		    auto maybe_move_result = iter->nth(ply.val);
-		    auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), "move_details_at");
+		    auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), func_name);
 
-		    MoveDetailsStruct<true> move;
+		    MoveDetailsStruct<true, MoveDetails> move;
+		    if (!maybe_move.has_value()) {
+			    move.valid = false;
+		    } else {
+			    move.inner = *maybe_move;
+		    }
+		    return move;
+	    });
+}
+
+inline void MoveDetailsLightAtFn(DataChunk &args, ExpressionState &state, Vector &result) {
+	const char *func_name = "move_details_light_at";
+
+	GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<int16_t>,
+	                               MoveDetailsStruct<true, MoveDetailsLight>>(
+	    args.data[0], args.data[1], result, args.size(), [&](PrimitiveType<string_t> game, PrimitiveType<int16_t> ply) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+
+		    auto game_obj_result = Game::from_bytes(data);
+		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		    auto iter = game_obj->move_details_light_iterator();
+		    auto maybe_move_result = iter->nth(ply.val);
+		    auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), func_name);
+
+		    MoveDetailsStruct<true, MoveDetailsLight> move;
 		    if (!maybe_move.has_value()) {
 			    move.valid = false;
 		    } else {
@@ -104,10 +156,20 @@ void Register_MoveDetails(ExtensionLoader &loader) {
 	move_children.push_back(std::make_pair("promotion", LogicalType::VARCHAR));
 	move_children.push_back(std::make_pair("capture", LogicalType::VARCHAR));
 	move_children.push_back(std::make_pair("is_castle", LogicalType::BOOLEAN));
+	move_children.push_back(std::make_pair("is_en_passant", LogicalType::BOOLEAN));
 	move_children.push_back(std::make_pair("is_check", LogicalType::BOOLEAN));
 	move_children.push_back(std::make_pair("is_checkmate", LogicalType::BOOLEAN));
 	move_children.push_back(std::make_pair("is_stalemate", LogicalType::BOOLEAN));
-	move_children.push_back(std::make_pair("is_en_passant", LogicalType::BOOLEAN));
+
+	child_list_t<LogicalType> move_children_light;
+	move_children_light.push_back(std::make_pair("ply", LogicalType::USMALLINT));
+	move_children_light.push_back(std::make_pair("role", LogicalType::VARCHAR));
+	move_children_light.push_back(std::make_pair("from", LogicalType::VARCHAR));
+	move_children_light.push_back(std::make_pair("to", LogicalType::VARCHAR));
+	move_children_light.push_back(std::make_pair("promotion", LogicalType::VARCHAR));
+	move_children_light.push_back(std::make_pair("capture", LogicalType::VARCHAR));
+	move_children_light.push_back(std::make_pair("is_castle", LogicalType::BOOLEAN));
+	move_children_light.push_back(std::make_pair("is_en_passant", LogicalType::BOOLEAN));
 
 	auto move_details_function = ScalarFunction("move_details", {LogicalType::BLOB},
 	                                            LogicalType::LIST(LogicalType::STRUCT(move_children)), MoveDetailsFn);
@@ -116,6 +178,16 @@ void Register_MoveDetails(ExtensionLoader &loader) {
 	auto move_details_at_function = ScalarFunction("move_details_at", {LogicalType::BLOB, LogicalType::SMALLINT},
 	                                               LogicalType::STRUCT(move_children), MoveDetailsAtFn);
 	loader.RegisterFunction(move_details_at_function);
+
+	auto move_details_light_function =
+	    ScalarFunction("move_details_light", {LogicalType::BLOB},
+	                   LogicalType::LIST(LogicalType::STRUCT(move_children_light)), MoveDetailsLightFn);
+	loader.RegisterFunction(move_details_light_function);
+
+	auto move_details_light_at_function =
+	    ScalarFunction("move_details_light_at", {LogicalType::BLOB, LogicalType::SMALLINT},
+	                   LogicalType::STRUCT(move_children_light), MoveDetailsLightAtFn);
+	loader.RegisterFunction(move_details_light_at_function);
 }
 
 } // namespace duckdb

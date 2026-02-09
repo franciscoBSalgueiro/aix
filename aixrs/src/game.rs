@@ -1,4 +1,4 @@
-use crate::ffi::{Bitboards, Game, MoveDetails};
+use crate::ffi::{Bitboards, Game, MoveDetails, MoveDetailsLight};
 use aix_chess_compression::{Decode, Decoder, EncodedGame};
 use diplomat_runtime::DiplomatWrite;
 use shakmaty::fen::Fen;
@@ -203,4 +203,46 @@ pub fn move_details_iterator<'a>(
             })
             .map_err(|e| e.into())
         })
+}
+
+pub fn move_details_light_iterator<'a>(
+    encoded: &'a EncodedGame,
+) -> impl Iterator<Item = Result<MoveDetailsLight, crate::ffi::DecodeError>> + 'a {
+    let decoder = Decoder::new(encoded);
+    decoder.into_iter_moves().enumerate().map(|(ply, r)| {
+        r.map(|m| {
+            let from = m.from().expect("from() should always be Some(...)") as u8;
+            let to = match m {
+                shakmaty::Move::Normal { to, .. }
+                | shakmaty::Move::EnPassant { to, .. }
+                | shakmaty::Move::Put { to, .. } => to,
+                shakmaty::Move::Castle { king, rook } => castling_king_dest(king, rook),
+            } as u8;
+            let capture = match m.capture() {
+                Some(role) => role.char() as i8,
+                None => 0,
+            };
+            let is_castle = m.is_castle();
+            let promotion = match m.promotion() {
+                Some(role) => role.char() as i8,
+                None => 0,
+            };
+            let role = m.role().char() as i8;
+            let ply = ply as u16;
+
+            let is_en_passant = m.is_en_passant();
+
+            MoveDetailsLight {
+                ply,
+                role,
+                from,
+                to,
+                capture,
+                is_castle,
+                promotion,
+                is_en_passant,
+            }
+        })
+        .map_err(|e| e.into())
+    })
 }

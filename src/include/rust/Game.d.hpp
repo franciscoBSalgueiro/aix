@@ -11,6 +11,8 @@
 
 namespace diplomat::capi { struct MoveDetailsIterator; }
 class MoveDetailsIterator;
+namespace diplomat::capi { struct MoveDetailsLightIterator; }
+class MoveDetailsLightIterator;
 struct Bitboards;
 class DecodeError;
 
@@ -41,6 +43,8 @@ public:
   inline static diplomat::result<size_t, DecodeError> recompress(diplomat::span<const uint8_t> data, uint8_t level, diplomat::span<uint8_t> out);
 
   inline std::unique_ptr<MoveDetailsIterator> move_details_iterator() const;
+
+  inline std::unique_ptr<MoveDetailsLightIterator> move_details_light_iterator() const;
 
   inline static bool is_valid_movedata(diplomat::span<const uint8_t> data);
 

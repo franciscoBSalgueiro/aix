@@ -90,6 +90,17 @@ mod ffi {
         pub is_en_passant: bool,
     }
 
+    pub struct MoveDetailsLight {
+        pub ply: u16,
+        pub role: i8,
+        pub from: u8,
+        pub to: u8,
+        pub capture: i8,
+        pub is_castle: bool,
+        pub promotion: i8,
+        pub is_en_passant: bool,
+    }
+
     pub enum DecodeError {
         NoErrorNoValue = 0,
         EmptyBlob = 1,
@@ -104,6 +115,11 @@ mod ffi {
     #[diplomat::opaque]
     pub struct MoveDetailsIterator<'a>(
         pub Box<dyn Iterator<Item = Result<MoveDetails, DecodeError>> + 'a>,
+    );
+
+    #[diplomat::opaque]
+    pub struct MoveDetailsLightIterator<'a>(
+        pub Box<dyn Iterator<Item = Result<MoveDetailsLight, DecodeError>> + 'a>,
     );
 
     impl<'a> Game<'a> {
@@ -149,6 +165,12 @@ mod ffi {
             )))
         }
 
+        pub fn move_details_light_iterator(&'a self) -> Box<MoveDetailsLightIterator<'a>> {
+            Box::new(MoveDetailsLightIterator::<'a>(Box::new(
+                crate::game::move_details_light_iterator(&self.0),
+            )))
+        }
+
         pub fn is_valid_movedata(data: &[u8]) -> bool {
             crate::game::is_valid_movedata(data)
         }
@@ -167,6 +189,30 @@ mod ffi {
                     .0
                     .by_ref()
                     .collect::<Result<Vec<MoveDetails>, DecodeError>>()?;
+                let i = collected.len() as i16 + n;
+                if i >= 0 {
+                    let result = collected.swap_remove(i as usize);
+                    Ok(result)
+                } else {
+                    Err(DecodeError::NoErrorNoValue)
+                }
+            }
+        }
+    }
+
+    impl<'a> MoveDetailsLightIterator<'a> {
+        pub fn next(&mut self) -> Result<MoveDetailsLight, DecodeError> {
+            crate::optional_result_to_result(self.0.next())
+        }
+
+        pub fn nth(&mut self, n: i16) -> Result<MoveDetailsLight, DecodeError> {
+            if n >= 0 {
+                crate::optional_result_to_result(self.0.nth(n as usize))
+            } else {
+                let mut collected = self
+                    .0
+                    .by_ref()
+                    .collect::<Result<Vec<MoveDetailsLight>, DecodeError>>()?;
                 let i = collected.len() as i16 + n;
                 if i >= 0 {
                     let result = collected.swap_remove(i as usize);

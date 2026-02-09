@@ -12,6 +12,7 @@
 #include "Bitboards.hpp"
 #include "DecodeError.hpp"
 #include "MoveDetailsIterator.hpp"
+#include "MoveDetailsLightIterator.hpp"
 #include "diplomat_runtime.hpp"
 
 
@@ -44,6 +45,8 @@ namespace capi {
     Game_recompress_result Game_recompress(diplomat::capi::DiplomatU8View data, uint8_t level, diplomat::capi::DiplomatU8ViewMut out);
     
     diplomat::capi::MoveDetailsIterator* Game_move_details_iterator(const diplomat::capi::Game* self);
+    
+    diplomat::capi::MoveDetailsLightIterator* Game_move_details_light_iterator(const diplomat::capi::Game* self);
     
     bool Game_is_valid_movedata(diplomat::capi::DiplomatU8View data);
     
@@ -115,6 +118,11 @@ inline diplomat::result<size_t, DecodeError> Game::recompress(diplomat::span<con
 inline std::unique_ptr<MoveDetailsIterator> Game::move_details_iterator() const {
   auto result = diplomat::capi::Game_move_details_iterator(this->AsFFI());
   return std::unique_ptr<MoveDetailsIterator>(MoveDetailsIterator::FromFFI(result));
+}
+
+inline std::unique_ptr<MoveDetailsLightIterator> Game::move_details_light_iterator() const {
+  auto result = diplomat::capi::Game_move_details_light_iterator(this->AsFFI());
+  return std::unique_ptr<MoveDetailsLightIterator>(MoveDetailsLightIterator::FromFFI(result));
 }
 
 inline bool Game::is_valid_movedata(diplomat::span<const uint8_t> data) {
