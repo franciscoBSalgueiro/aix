@@ -8,7 +8,7 @@ The Aix extension provides several scalar functions in DuckDB that can be applie
 
 Returns the board at a given position as a struct. The starting position is 0, so the final position is `ply_count`.
 
-Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count - N + 1`.
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
 
 ## clocks_to_move_times
@@ -40,7 +40,7 @@ Use `list_eval_to_centipawns` or `list_eval_to_mate` to apply these functions to
 
 Returns the FEN at a given position. The starting position is 0, so the final position is `ply_count`.
 
-Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count - N + 1`.
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
 
 ## is_valid_movedata
@@ -78,7 +78,7 @@ Returns a list of details of all moves in the game. Note that lists in DuckDB ar
 
 Returns the details of a given move in the game. This function is 0-indexed, so the first move is `move_details_at(..., 0)`. This also means that `move_details_at(..., x) = move_details(...)[x + 1]`.
 
-Negative indices are accepted, the last move is -1. However, it is faster to pass a positive index based on the `ply_count` column, if available: `-N` is equal to `ply_count - N`.
+Negative indices are accepted, the last move is -1. However, it is faster to pass a positive index based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N`.
 
 `move_details_full_at` is slower but returns more detailed information about the effect of the move (`is_check`, `is_checkmate`, `is_stalemate`).
 
@@ -103,7 +103,7 @@ Returns the moved pieces in order as a list, e.g. `[P, p, B, n, N, p, K, n, P, b
 
 Returns the piece counts at a given position. The starting position is 0, so the final position is `ply_count`.
 
-Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count - N + 1`.
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
 
 ## pieces_at_position
@@ -112,7 +112,7 @@ Negative integers are accepted, the final position is -1. However, it is faster 
 
 Returns the squares where the pieces are on at a given position. The starting position is 0, so the final position is `ply_count`.
 
-Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count - N + 1`.
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
 
 ## recompress
