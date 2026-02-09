@@ -59,20 +59,26 @@ A sub-FEN consists of only the piece placement part of a FEN (e.g. `8/8/p7/8/8/1
 and matches if a position contains at least those pieces.
 
 
-## move_details
+## move_details(_full)
 
-`move_details(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_en_passant BOOLEAN)[]`
+`move_details(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN,  is_en_passant BOOLEAN)[]`
+`move_details_full(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN)[]`
 
 Returns a list of details of all moves in the game. Note that lists in DuckDB are 1-indexed, so the first move is `move_details(...)[1]`.
 
+`move_details_full` is slower but returns more detailed information about the effect of the moves (`is_check`, `is_checkmate`, `is_stalemate`).
 
-## move_details_at
 
-`move_details(movedata BLOB, index INTEGER) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_en_passant BOOLEAN)`
+## move_details(_full)_at
+
+`move_details_at(movedata BLOB, index SMALLINT) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN)`
+`move_details_full_at(movedata BLOB, index SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN)`
 
 Returns the details of a given move in the game. This function is 0-indexed, so the first move is `move_details_at(..., 0)`. This also means that `move_details_at(..., x) = move_details(...)[x + 1]`.
 
 Negative indices are accepted, the last move is -1. However, it is faster to pass a positive index based on the `ply_count` column, if available: `-N` is equal to `ply_count - N`.
+
+`move_details_full_at` is slower but returns more detailed information about the effect of the move (`is_check`, `is_checkmate`, `is_stalemate`).
 
 
 ## moved_pieces
