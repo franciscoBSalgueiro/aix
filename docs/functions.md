@@ -48,6 +48,14 @@ A sub-FEN consists of only the piece placement part of a FEN (e.g. `8/8/p7/8/8/1
 and matches if a position contains at least those pieces.
 
 
+## matches_fen
+
+`matches_fen(movedata BLOB, fen VARCHAR) -> BOOLEAN`
+
+Returns true if any position in the game exactly matches a given piece-placement FEN.
+Unlike `matches_subfen`, this requires an exact board match.
+
+
 ## move_details
 
 `move_details(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_en_passant BOOLEAN)[]`

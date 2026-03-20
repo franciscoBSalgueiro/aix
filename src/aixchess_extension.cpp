@@ -33,6 +33,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	Register_PieceCountsAtPosition(loader);
 	Register_BoardAtPosition(loader);
 	Register_MatchesSubfen(loader);
+	Register_MatchesFen(loader);
 	Register_ScoutfishQuery(loader);
 	Register_ClocksToMoveTimes(loader);
 	Register_LichessTimeControl(loader);

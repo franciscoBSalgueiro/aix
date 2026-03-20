@@ -580,7 +580,7 @@ impl Rule {
             let mut matched = false;
 
             for sf in sub_fen {
-                if crate::subfen::matches_board(sf, board) {
+                if crate::subfen::matches_board(sf, board, false) {
                     matched = true;
                     break;
                 }

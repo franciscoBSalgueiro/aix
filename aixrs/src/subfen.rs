@@ -22,7 +22,7 @@ pub fn matches(subfen: Subfen, game: &[u8]) -> Result<bool, crate::ffi::DecodeEr
     for position in decoder.into_iter_positions() {
         let position = position?;
         let board = position.board();
-        if matches_board(&subfen, board) {
+        if matches_board(&subfen, board, false) {
             return Ok(true);
         }
     }
@@ -30,13 +30,38 @@ pub fn matches(subfen: Subfen, game: &[u8]) -> Result<bool, crate::ffi::DecodeEr
     Ok(false)
 }
 
-pub fn matches_board(subfen: &Subfen, board: &Board) -> bool {
-    (board.white().0 & subfen.white) == subfen.white
-        && (board.black().0 & subfen.black) == subfen.black
-        && (board.kings().0 & subfen.king) == subfen.king
-        && (board.queens().0 & subfen.queen) == subfen.queen
-        && (board.rooks().0 & subfen.rook) == subfen.rook
-        && (board.bishops().0 & subfen.bishop) == subfen.bishop
-        && (board.knights().0 & subfen.knight) == subfen.knight
-        && (board.pawns().0 & subfen.pawn) == subfen.pawn
+pub fn matches_fen(subfen: Subfen, game: &[u8]) -> Result<bool, crate::ffi::DecodeError> {
+    let encoded = EncodedGame::from_bytes(game)?;
+    let decoder = Decoder::new(&encoded);
+    for position in decoder.into_iter_positions() {
+        let position = position?;
+        let board = position.board();
+        if matches_board(&subfen, board, true) {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+pub fn matches_board(subfen: &Subfen, board: &Board, exact: bool) -> bool {
+    if exact {
+        board.white().0 == subfen.white
+            && board.black().0 == subfen.black
+            && board.kings().0 == subfen.king
+            && board.queens().0 == subfen.queen
+            && board.rooks().0 == subfen.rook
+            && board.bishops().0 == subfen.bishop
+            && board.knights().0 == subfen.knight
+            && board.pawns().0 == subfen.pawn
+    } else {
+        (board.white().0 & subfen.white) == subfen.white
+            && (board.black().0 & subfen.black) == subfen.black
+            && (board.kings().0 & subfen.king) == subfen.king
+            && (board.queens().0 & subfen.queen) == subfen.queen
+            && (board.rooks().0 & subfen.rook) == subfen.rook
+            && (board.bishops().0 & subfen.bishop) == subfen.bishop
+            && (board.knights().0 & subfen.knight) == subfen.knight
+            && (board.pawns().0 & subfen.pawn) == subfen.pawn
+    }
 }

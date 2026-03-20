@@ -238,6 +238,10 @@ mod ffi {
         pub fn matches(self, game: &[u8]) -> Result<bool, DecodeError> {
             crate::subfen::matches(self, game)
         }
+
+        pub fn matches_fen(self, game: &[u8]) -> Result<bool, DecodeError> {
+            crate::subfen::matches_fen(self, game)
+        }
     }
 
     #[diplomat::opaque]

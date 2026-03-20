@@ -44,6 +44,8 @@ struct Subfen {
 
   inline diplomat::result<bool, DecodeError> matches(diplomat::span<const uint8_t> game);
 
+  inline diplomat::result<bool, DecodeError> matches_fen(diplomat::span<const uint8_t> game);
+
   inline diplomat::capi::Subfen AsFFI() const;
   inline static Subfen FromFFI(diplomat::capi::Subfen c_struct);
 };

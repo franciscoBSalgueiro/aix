@@ -22,6 +22,9 @@ namespace capi {
     
     typedef struct Subfen_matches_result {union {bool ok; diplomat::capi::DecodeError err;}; bool is_ok;} Subfen_matches_result;
     Subfen_matches_result Subfen_matches(diplomat::capi::Subfen self, diplomat::capi::DiplomatU8View game);
+
+    typedef struct Subfen_matches_fen_result {union {bool ok; diplomat::capi::DecodeError err;}; bool is_ok;} Subfen_matches_fen_result;
+    Subfen_matches_fen_result Subfen_matches_fen(diplomat::capi::Subfen self, diplomat::capi::DiplomatU8View game);
     
     
     } // extern "C"
@@ -35,6 +38,12 @@ inline diplomat::result<Subfen, std::monostate> Subfen::parse(std::string_view s
 
 inline diplomat::result<bool, DecodeError> Subfen::matches(diplomat::span<const uint8_t> game) {
   auto result = diplomat::capi::Subfen_matches(this->AsFFI(),
+    {game.data(), game.size()});
+  return result.is_ok ? diplomat::result<bool, DecodeError>(diplomat::Ok<bool>(result.ok)) : diplomat::result<bool, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
+inline diplomat::result<bool, DecodeError> Subfen::matches_fen(diplomat::span<const uint8_t> game) {
+  auto result = diplomat::capi::Subfen_matches_fen(this->AsFFI(),
     {game.data(), game.size()});
   return result.is_ok ? diplomat::result<bool, DecodeError>(diplomat::Ok<bool>(result.ok)) : diplomat::result<bool, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
