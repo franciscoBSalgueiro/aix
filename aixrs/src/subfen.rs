@@ -32,7 +32,7 @@ pub fn try_parse_fen(fen: &[u8]) -> Result<Fen, ParseFenError> {
         white_to_move: position.turn() == Color::White,
         castling_rights: position.castles().castling_rights().0,
         ep_square: position
-            .maybe_ep_square()
+            .legal_ep_square()
             .map(|square| square.to_u32() as i8)
             .unwrap_or(-1),
     })
@@ -131,7 +131,7 @@ fn matches_fen_state(fen: &Fen, position: &Chess) -> bool {
         && (position.turn() == Color::White) == fen.white_to_move
         && position.castles().castling_rights().0 == fen.castling_rights
         && position
-            .maybe_ep_square()
+            .legal_ep_square()
             .map(|square| square.to_u32() as i8)
             .unwrap_or(-1)
             == fen.ep_square
