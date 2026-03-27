@@ -238,6 +238,28 @@ mod ffi {
         pub fn matches(self, game: &[u8]) -> Result<bool, DecodeError> {
             crate::subfen::matches(self, game)
         }
+    }
+
+    #[cfg_attr(test, derive(Debug, PartialEq))]
+    #[derive(bincode::Encode, bincode::Decode)]
+    pub struct Fen {
+        pub white: u64,
+        pub black: u64,
+        pub king: u64,
+        pub queen: u64,
+        pub rook: u64,
+        pub bishop: u64,
+        pub knight: u64,
+        pub pawn: u64,
+        pub white_to_move: bool,
+        pub castling_rights: u64,
+        pub ep_square: i8,
+    }
+
+    impl Fen {
+        pub fn parse(fen: &DiplomatStr) -> Result<Fen, ()> {
+            crate::subfen::try_parse_fen(fen).map_err(|_| ())
+        }
 
         pub fn matches_fen(self, game: &[u8]) -> Result<bool, DecodeError> {
             crate::subfen::matches_fen(self, game)

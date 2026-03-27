@@ -6,6 +6,7 @@
 
 #include "rust/Game.hpp"
 #include "rust/Bitboards.hpp"
+#include "rust/Fen.hpp"
 #include "rust/Subfen.hpp"
 #include "rust/ScoutfishQuery.hpp"
 #include "rust/ScoutfishQueryParseError.hpp"

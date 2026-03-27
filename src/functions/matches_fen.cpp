@@ -5,46 +5,47 @@ namespace duckdb {
 namespace {
 
 struct MatchesFenBindData : public FunctionData {
-	explicit MatchesFenBindData(Subfen subfen_p, bool is_null) : subfen(std::move(subfen_p)), is_null(is_null) {
+	explicit MatchesFenBindData(Fen fen_p, bool is_null) : fen(std::move(fen_p)), is_null(is_null) {
 	}
 
-	Subfen subfen;
+	Fen fen;
 	bool is_null;
 
 	unique_ptr<FunctionData> Copy() const override {
-		return make_uniq<MatchesFenBindData>(subfen, is_null);
+		return make_uniq<MatchesFenBindData>(fen, is_null);
 	}
 
 	bool Equals(const FunctionData &other_p) const override {
 		auto &other = other_p.Cast<MatchesFenBindData>();
-		return subfen.white == other.subfen.white && subfen.black == other.subfen.black &&
-		       subfen.king == other.subfen.king && subfen.queen == other.subfen.queen &&
-		       subfen.rook == other.subfen.rook && subfen.bishop == other.subfen.bishop &&
-		       subfen.knight == other.subfen.knight && subfen.pawn == other.subfen.pawn;
+		return fen.white == other.fen.white && fen.black == other.fen.black && fen.king == other.fen.king &&
+		       fen.queen == other.fen.queen && fen.rook == other.fen.rook && fen.bishop == other.fen.bishop &&
+		       fen.knight == other.fen.knight && fen.pawn == other.fen.pawn &&
+		       fen.white_to_move == other.fen.white_to_move &&
+		       fen.castling_rights == other.fen.castling_rights && fen.ep_square == other.fen.ep_square;
 	}
 };
 
 static unique_ptr<FunctionData> MatchesFenBindFunction(ClientContext &context, ScalarFunction &bound_function,
                                                        vector<unique_ptr<Expression>> &arguments) {
-	auto &subfen_arg = arguments[1];
-	if (subfen_arg->HasParameter()) {
+	auto &fen_arg = arguments[1];
+	if (fen_arg->HasParameter()) {
 		throw ParameterNotResolvedException();
 	}
-	if (!subfen_arg->IsFoldable()) {
-		throw InvalidInputException(*subfen_arg, "fen must be a constant");
+	if (!fen_arg->IsFoldable()) {
+		throw InvalidInputException(*fen_arg, "fen must be a constant");
 	}
-	Value options_str = ExpressionExecutor::EvaluateScalar(context, *subfen_arg);
-	auto subfen_string = options_str.GetValue<string>();
-	Subfen subfen;
+	Value options_str = ExpressionExecutor::EvaluateScalar(context, *fen_arg);
+	auto fen_string = options_str.GetValue<string>();
+	Fen fen;
 	bool is_null = options_str.IsNull();
 	if (!is_null) {
-		auto subfen_result = Subfen::parse(subfen_string);
-		if (subfen_result.is_err()) {
-			throw InvalidInputException(*subfen_arg, "failed to parse fen");
+		auto fen_result = Fen::parse(fen_string);
+		if (fen_result.is_err()) {
+			throw InvalidInputException(*fen_arg, "failed to parse fen");
 		}
-		subfen = *std::move(subfen_result).ok();
+		fen = *std::move(fen_result).ok();
 	}
-	return make_uniq<MatchesFenBindData>(subfen, is_null);
+	return make_uniq<MatchesFenBindData>(fen, is_null);
 }
 
 inline void MatchesFen(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -60,11 +61,11 @@ inline void MatchesFen(DataChunk &args, ExpressionState &state, Vector &result) 
 	auto &game_vector = args.data[0];
 	auto count = args.size();
 
-	auto subfen = info.subfen;
+	auto fen = info.fen;
 
 	UnaryExecutor::Execute<string_t, bool>(game_vector, result, count, [&](string_t game) {
 		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
-		return UnwrapDecoded<bool>(subfen.matches_fen(data), "matches_fen");
+		return UnwrapDecoded<bool>(fen.matches_fen(data), "matches_fen");
 	});
 }
 
