@@ -250,8 +250,6 @@ mod ffi {
         }
     }
 
-    #[cfg_attr(test, derive(Debug, PartialEq))]
-    #[derive(bincode::Encode, bincode::Decode)]
     pub struct Fen {
         pub white: u64,
         pub black: u64,

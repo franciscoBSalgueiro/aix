@@ -20,8 +20,8 @@ struct MatchesFenBindData : public FunctionData {
 		return fen.white == other.fen.white && fen.black == other.fen.black && fen.king == other.fen.king &&
 		       fen.queen == other.fen.queen && fen.rook == other.fen.rook && fen.bishop == other.fen.bishop &&
 		       fen.knight == other.fen.knight && fen.pawn == other.fen.pawn &&
-		       fen.white_to_move == other.fen.white_to_move &&
-		       fen.castling_rights == other.fen.castling_rights && fen.ep_square == other.fen.ep_square;
+		       fen.white_to_move == other.fen.white_to_move && fen.castling_rights == other.fen.castling_rights &&
+		       fen.ep_square == other.fen.ep_square;
 	}
 };
 

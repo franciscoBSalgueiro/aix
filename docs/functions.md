@@ -63,7 +63,9 @@ and matches if a position contains at least those pieces.
 
 `matches_fen(movedata BLOB, fen VARCHAR) -> BOOLEAN`
 
-Returns true if any position in the game exactly matches a given piece-placement FEN.
+Returns true if any position in the game exactly matches a given the piece placement, castling rights,
+side to move, and en passant square of a given FEN.
+The move counters are ignored.
 Unlike `matches_subfen`, this requires an exact board match.
 
 

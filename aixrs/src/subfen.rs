@@ -1,7 +1,8 @@
 use crate::ffi::{Fen, Subfen};
 use aix_chess_compression::{Decode, Decoder, EncodedGame};
 use shakmaty::{
-    Board, CastlingMode, Chess, Color, FromSetup, Position, fen::{Fen as ShakmatyFen, ParseFenError}
+    fen::{Fen as ShakmatyFen, ParseFenError},
+    Board, CastlingMode, Chess, Color, FromSetup, Position,
 };
 
 const SECOND_RANK: u64 = 0x0000_0000_0000_ff00;
@@ -84,7 +85,6 @@ pub fn matches_fen(fen: Fen, game: &[u8]) -> Result<bool, crate::ffi::DecodeErro
 
     Ok(false)
 }
-
 
 fn get_pawn_home(board: &Board) -> u16 {
     let white_pawns = (board.pawns() & board.white()).0;
