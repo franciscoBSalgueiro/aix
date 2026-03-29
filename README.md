@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/1147201753.svg)](https://zenodo.org/badge/latestdoi/1147201753)
+
 # Aix - `aixchess` DuckDB extension
 
 Aix enables efficient storage and querying of large chess game collections. Read more on [my blog post](https://thomasd.be/2026/02/01/aix-storing-querying-chess-games.html) and the [documentation](docs/README.md).
@@ -54,3 +56,7 @@ GEN=ninja make
 ```
 
 A DuckDB binary with the extension loaded is then available in `./build/release/duckdb`. Running unit tests is possible with `make test`.
+
+## Citing this repository
+
+If you use Aix in your research, please consider citing this repository using the Zenodo DOI: https://doi.org/10.5281/zenodo.18636703
