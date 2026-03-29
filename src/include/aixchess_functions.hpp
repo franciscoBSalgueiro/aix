@@ -6,6 +6,7 @@
 
 #include "rust/Game.hpp"
 #include "rust/Bitboards.hpp"
+#include "rust/Fen.hpp"
 #include "rust/Subfen.hpp"
 #include "rust/ScoutfishQuery.hpp"
 #include "rust/ScoutfishQueryParseError.hpp"
@@ -25,6 +26,7 @@ void Register_PiecesAtPosition(ExtensionLoader &loader);
 void Register_PieceCountsAtPosition(ExtensionLoader &loader);
 void Register_BoardAtPosition(ExtensionLoader &loader);
 void Register_MatchesSubfen(ExtensionLoader &loader);
+void Register_MatchesFen(ExtensionLoader &loader);
 void Register_ScoutfishQuery(ExtensionLoader &loader);
 void Register_ClocksToMoveTimes(ExtensionLoader &loader);
 void Register_LichessTimeControl(ExtensionLoader &loader);
