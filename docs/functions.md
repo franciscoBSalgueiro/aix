@@ -140,7 +140,7 @@ Returns true if a game matches a [Scoutfish](https://github.com/mcostalba/scoutf
 
 The behavior of Aix does not entirely match that of Scoutfish, and that is by design:
 
-* Aix does not support Scoutfish's `result` and `result-type` -- use the [`result`/`termination` columns](columns.md) and `is_checkmate`/`is_stalemate` from [`move_details_at`](#move_details_at).
+* Aix does not support Scoutfish's `result` and `result-type` -- use the [`result`/`termination` columns](columns.md) and `is_checkmate`/`is_stalemate` from [`move_details(_ext__at`](#move_details_ext_at).
 * Aix fixes [scoutfish#45](https://github.com/mcostalba/scoutfish/issues/45) and [scoutfish#56](https://github.com/mcostalba/scoutfish/issues/56).
 
 There are likely more differences. If Aix's output does not match expectations, please open an issue.
