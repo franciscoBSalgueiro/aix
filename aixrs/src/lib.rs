@@ -76,7 +76,7 @@ mod ffi {
         pub b_p: u64,
     }
 
-    pub struct MoveDetailsFull {
+    pub struct MoveDetailsExtended {
         pub ply: u16,
         pub role: i8,
         pub from: u8,
@@ -84,10 +84,11 @@ mod ffi {
         pub capture: i8,
         pub is_castle: bool,
         pub promotion: i8,
+        pub is_en_passant: bool,
         pub is_check: bool,
         pub is_checkmate: bool,
         pub is_stalemate: bool,
-        pub is_en_passant: bool,
+        pub legal_response_move_count: u8,
     }
 
     pub struct MoveDetails {
@@ -99,6 +100,8 @@ mod ffi {
         pub is_castle: bool,
         pub promotion: i8,
         pub is_en_passant: bool,
+        pub is_check: bool,
+        pub is_checkmate: bool,
     }
 
     pub enum DecodeError {
@@ -113,8 +116,8 @@ mod ffi {
     pub struct Game<'a>(pub EncodedGame<'a>);
 
     #[diplomat::opaque]
-    pub struct MoveDetailsFullIterator<'a>(
-        pub Box<dyn Iterator<Item = Result<MoveDetailsFull, DecodeError>> + 'a>,
+    pub struct MoveDetailsExtIterator<'a>(
+        pub Box<dyn Iterator<Item = Result<MoveDetailsExtended, DecodeError>> + 'a>,
     );
 
     #[diplomat::opaque]
@@ -159,15 +162,15 @@ mod ffi {
             Ok(written)
         }
 
-        pub fn move_details_full_iterator(&'a self) -> Box<MoveDetailsFullIterator<'a>> {
-            Box::new(MoveDetailsFullIterator::<'a>(Box::new(
-                crate::game::move_details_iterator(&self.0),
+        pub fn move_details_ext_iterator(&'a self) -> Box<MoveDetailsExtIterator<'a>> {
+            Box::new(MoveDetailsExtIterator::<'a>(Box::new(
+                crate::game::move_details_ext_iterator(&self.0),
             )))
         }
 
         pub fn move_details_iterator(&'a self) -> Box<MoveDetailsIterator<'a>> {
             Box::new(MoveDetailsIterator::<'a>(Box::new(
-                crate::game::move_details_light_iterator(&self.0),
+                crate::game::move_details_iterator(&self.0),
             )))
         }
 
@@ -176,19 +179,19 @@ mod ffi {
         }
     }
 
-    impl<'a> MoveDetailsFullIterator<'a> {
-        pub fn next(&mut self) -> Result<MoveDetailsFull, DecodeError> {
+    impl<'a> MoveDetailsExtIterator<'a> {
+        pub fn next(&mut self) -> Result<MoveDetailsExtended, DecodeError> {
             crate::optional_result_to_result(self.0.next())
         }
 
-        pub fn nth(&mut self, n: i16) -> Result<MoveDetailsFull, DecodeError> {
+        pub fn nth(&mut self, n: i16) -> Result<MoveDetailsExtended, DecodeError> {
             if n >= 0 {
                 crate::optional_result_to_result(self.0.nth(n as usize))
             } else {
                 let mut collected = self
                     .0
                     .by_ref()
-                    .collect::<Result<Vec<MoveDetailsFull>, DecodeError>>()?;
+                    .collect::<Result<Vec<MoveDetailsExtended>, DecodeError>>()?;
                 let i = collected.len() as i16 + n;
                 if i >= 0 {
                     let result = collected.swap_remove(i as usize);

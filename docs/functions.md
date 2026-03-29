@@ -59,28 +59,28 @@ A sub-FEN consists of only the piece placement part of a FEN (e.g. `8/8/p7/8/8/1
 and matches if a position contains at least those pieces.
 
 
-## move_details(_full)
+## move_details(_ext)
 
-`move_details(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN,  is_en_passant BOOLEAN)[]`
+`move_details(BLOB) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)[]`
 
-`move_details_full(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN)[]`
+`move_details_ext(BLOB) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN, legal_response_move_count UTINYINT)[]`
 
 Returns a list of details of all moves in the game. Note that lists in DuckDB are 1-indexed, so the first move is `move_details(...)[1]`.
 
-`move_details_full` is slower but returns more detailed information about the effect of the moves (`is_check`, `is_checkmate`, `is_stalemate`).
+`move_details_ext` is significantly slower but includes the additional `is_stalemate` and `legal_response_move_count` fields. `legal_response_move_count` is the number of legal moves available to the opponent after the move (so `0` means checkmate or stalemate).
 
 
-## move_details(_full)_at
+## move_details(_ext)_at
 
-`move_details_at(movedata BLOB, index SMALLINT) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN)`
+`move_details_at(BLOB, SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)`
 
-`move_details_full_at(movedata BLOB, index SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN)`
+`move_details_ext_at(BLOB, SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN, legal_response_move_count UTINYINT)`
 
 Returns the details of a given move in the game. This function is 0-indexed, so the first move is `move_details_at(..., 0)`. This also means that `move_details_at(..., x) = move_details(...)[x + 1]`.
 
 Negative indices are accepted, the last move is -1. However, it is faster to pass a positive index based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N`.
 
-`move_details_full_at` is slower but returns more detailed information about the effect of the move (`is_check`, `is_checkmate`, `is_stalemate`).
+`move_details_ext_at` is significantly slower but includes the additional `is_stalemate` and `legal_response_move_count` fields. `legal_response_move_count` is the number of legal moves available to the opponent after the move (so `0` means checkmate or stalemate).
 
 
 ## moved_pieces

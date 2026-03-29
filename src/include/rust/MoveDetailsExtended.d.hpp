@@ -1,5 +1,5 @@
-#ifndef MoveDetailsFull_D_HPP
-#define MoveDetailsFull_D_HPP
+#ifndef MoveDetailsExtended_D_HPP
+#define MoveDetailsExtended_D_HPP
 
 #include <stdio.h>
 #include <stdint.h>
@@ -12,7 +12,7 @@
 
 namespace diplomat {
 namespace capi {
-    struct MoveDetailsFull {
+    struct MoveDetailsExtended {
       uint16_t ply;
       int8_t role;
       uint8_t from;
@@ -20,18 +20,19 @@ namespace capi {
       int8_t capture;
       bool is_castle;
       int8_t promotion;
+      bool is_en_passant;
       bool is_check;
       bool is_checkmate;
       bool is_stalemate;
-      bool is_en_passant;
+      uint8_t legal_response_move_count;
     };
     
-    typedef struct MoveDetailsFull_option {union { MoveDetailsFull ok; }; bool is_ok; } MoveDetailsFull_option;
+    typedef struct MoveDetailsExtended_option {union { MoveDetailsExtended ok; }; bool is_ok; } MoveDetailsExtended_option;
 } // namespace capi
 } // namespace
 
 
-struct MoveDetailsFull {
+struct MoveDetailsExtended {
   uint16_t ply;
   int8_t role;
   uint8_t from;
@@ -39,14 +40,15 @@ struct MoveDetailsFull {
   int8_t capture;
   bool is_castle;
   int8_t promotion;
+  bool is_en_passant;
   bool is_check;
   bool is_checkmate;
   bool is_stalemate;
-  bool is_en_passant;
+  uint8_t legal_response_move_count;
 
-  inline diplomat::capi::MoveDetailsFull AsFFI() const;
-  inline static MoveDetailsFull FromFFI(diplomat::capi::MoveDetailsFull c_struct);
+  inline diplomat::capi::MoveDetailsExtended AsFFI() const;
+  inline static MoveDetailsExtended FromFFI(diplomat::capi::MoveDetailsExtended c_struct);
 };
 
 
-#endif // MoveDetailsFull_D_HPP
+#endif // MoveDetailsExtended_D_HPP

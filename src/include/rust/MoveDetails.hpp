@@ -32,6 +32,8 @@ inline diplomat::capi::MoveDetails MoveDetails::AsFFI() const {
     /* .is_castle = */ is_castle,
     /* .promotion = */ promotion,
     /* .is_en_passant = */ is_en_passant,
+    /* .is_check = */ is_check,
+    /* .is_checkmate = */ is_checkmate,
   };
 }
 
@@ -45,6 +47,8 @@ inline MoveDetails MoveDetails::FromFFI(diplomat::capi::MoveDetails c_struct) {
     /* .is_castle = */ c_struct.is_castle,
     /* .promotion = */ c_struct.promotion,
     /* .is_en_passant = */ c_struct.is_en_passant,
+    /* .is_check = */ c_struct.is_check,
+    /* .is_checkmate = */ c_struct.is_checkmate,
   };
 }
 

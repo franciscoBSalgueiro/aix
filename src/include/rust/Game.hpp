@@ -11,7 +11,7 @@
 #include <optional>
 #include "Bitboards.hpp"
 #include "DecodeError.hpp"
-#include "MoveDetailsFullIterator.hpp"
+#include "MoveDetailsExtIterator.hpp"
 #include "MoveDetailsIterator.hpp"
 #include "diplomat_runtime.hpp"
 
@@ -44,7 +44,7 @@ namespace capi {
     typedef struct Game_recompress_result {union {size_t ok; diplomat::capi::DecodeError err;}; bool is_ok;} Game_recompress_result;
     Game_recompress_result Game_recompress(diplomat::capi::DiplomatU8View data, uint8_t level, diplomat::capi::DiplomatU8ViewMut out);
     
-    diplomat::capi::MoveDetailsFullIterator* Game_move_details_full_iterator(const diplomat::capi::Game* self);
+    diplomat::capi::MoveDetailsExtIterator* Game_move_details_ext_iterator(const diplomat::capi::Game* self);
     
     diplomat::capi::MoveDetailsIterator* Game_move_details_iterator(const diplomat::capi::Game* self);
     
@@ -115,9 +115,9 @@ inline diplomat::result<size_t, DecodeError> Game::recompress(diplomat::span<con
   return result.is_ok ? diplomat::result<size_t, DecodeError>(diplomat::Ok<size_t>(result.ok)) : diplomat::result<size_t, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
 
-inline std::unique_ptr<MoveDetailsFullIterator> Game::move_details_full_iterator() const {
-  auto result = diplomat::capi::Game_move_details_full_iterator(this->AsFFI());
-  return std::unique_ptr<MoveDetailsFullIterator>(MoveDetailsFullIterator::FromFFI(result));
+inline std::unique_ptr<MoveDetailsExtIterator> Game::move_details_ext_iterator() const {
+  auto result = diplomat::capi::Game_move_details_ext_iterator(this->AsFFI());
+  return std::unique_ptr<MoveDetailsExtIterator>(MoveDetailsExtIterator::FromFFI(result));
 }
 
 inline std::unique_ptr<MoveDetailsIterator> Game::move_details_iterator() const {

@@ -1,4 +1,4 @@
-use crate::ffi::{Bitboards, Game, MoveDetailsFull, MoveDetails};
+use crate::ffi::{Bitboards, Game, MoveDetails, MoveDetailsExtended};
 use aix_chess_compression::{Decode, Decoder, EncodedGame};
 use diplomat_runtime::DiplomatWrite;
 use shakmaty::fen::Fen;
@@ -150,9 +150,9 @@ fn castling_king_dest(king: shakmaty::Square, rook: shakmaty::Square) -> shakmat
     shakmaty::Square::from_coords(side.king_to_file(), king.rank())
 }
 
-pub fn move_details_iterator<'a>(
+pub fn move_details_ext_iterator<'a>(
     encoded: &'a EncodedGame,
-) -> impl Iterator<Item = Result<MoveDetailsFull, crate::ffi::DecodeError>> + 'a {
+) -> impl Iterator<Item = Result<MoveDetailsExtended, crate::ffi::DecodeError>> + 'a {
     let decoder = Decoder::new(encoded);
     decoder
         .into_iter_moves_and_positions()
@@ -179,7 +179,9 @@ pub fn move_details_iterator<'a>(
                 let ply = ply as u16;
 
                 let checkers = pos.checkers();
-                let no_legal_moves = pos.legal_moves().is_empty();
+                let legal_moves = pos.legal_moves();
+                let no_legal_moves = legal_moves.is_empty();
+                let legal_response_move_count = legal_moves.len() as u8;
 
                 let is_check = checkers.any();
                 let is_checkmate = is_check && no_legal_moves;
@@ -187,7 +189,7 @@ pub fn move_details_iterator<'a>(
 
                 let is_en_passant = m.is_en_passant();
 
-                MoveDetailsFull {
+                MoveDetailsExtended {
                     ply,
                     role,
                     from,
@@ -195,54 +197,64 @@ pub fn move_details_iterator<'a>(
                     capture,
                     is_castle,
                     promotion,
+                    is_en_passant,
                     is_check,
                     is_checkmate,
                     is_stalemate,
-                    is_en_passant,
+                    legal_response_move_count,
                 }
             })
             .map_err(|e| e.into())
         })
 }
 
-pub fn move_details_light_iterator<'a>(
+pub fn move_details_iterator<'a>(
     encoded: &'a EncodedGame,
 ) -> impl Iterator<Item = Result<MoveDetails, crate::ffi::DecodeError>> + 'a {
     let decoder = Decoder::new(encoded);
-    decoder.into_iter_moves().enumerate().map(|(ply, r)| {
-        r.map(|m| {
-            let from = m.from().expect("from() should always be Some(...)") as u8;
-            let to = match m {
-                shakmaty::Move::Normal { to, .. }
-                | shakmaty::Move::EnPassant { to, .. }
-                | shakmaty::Move::Put { to, .. } => to,
-                shakmaty::Move::Castle { king, rook } => castling_king_dest(king, rook),
-            } as u8;
-            let capture = match m.capture() {
-                Some(role) => role.char() as i8,
-                None => 0,
-            };
-            let is_castle = m.is_castle();
-            let promotion = match m.promotion() {
-                Some(role) => role.char() as i8,
-                None => 0,
-            };
-            let role = m.role().char() as i8;
-            let ply = ply as u16;
+    decoder
+        .into_iter_moves_and_positions()
+        .enumerate()
+        .map(|(ply, r)| {
+            r.map(|(m, pos)| {
+                let from = m.from().expect("from() should always be Some(...)") as u8;
+                let to = match m {
+                    shakmaty::Move::Normal { to, .. }
+                    | shakmaty::Move::EnPassant { to, .. }
+                    | shakmaty::Move::Put { to, .. } => to,
+                    shakmaty::Move::Castle { king, rook } => castling_king_dest(king, rook),
+                } as u8;
+                let capture = match m.capture() {
+                    Some(role) => role.char() as i8,
+                    None => 0,
+                };
+                let is_castle = m.is_castle();
+                let promotion = match m.promotion() {
+                    Some(role) => role.char() as i8,
+                    None => 0,
+                };
+                let role = m.role().char() as i8;
+                let ply = ply as u16;
 
-            let is_en_passant = m.is_en_passant();
+                let checkers = pos.checkers();
+                let is_check = checkers.any();
+                let is_checkmate = is_check && pos.legal_moves().is_empty();
 
-            MoveDetails {
-                ply,
-                role,
-                from,
-                to,
-                capture,
-                is_castle,
-                promotion,
-                is_en_passant,
-            }
+                let is_en_passant = m.is_en_passant();
+
+                MoveDetails {
+                    ply,
+                    role,
+                    from,
+                    to,
+                    capture,
+                    is_castle,
+                    promotion,
+                    is_en_passant,
+                    is_check,
+                    is_checkmate,
+                }
+            })
+            .map_err(|e| e.into())
         })
-        .map_err(|e| e.into())
-    })
 }

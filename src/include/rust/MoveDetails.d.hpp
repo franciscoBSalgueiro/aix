@@ -21,6 +21,8 @@ namespace capi {
       bool is_castle;
       int8_t promotion;
       bool is_en_passant;
+      bool is_check;
+      bool is_checkmate;
     };
     
     typedef struct MoveDetails_option {union { MoveDetails ok; }; bool is_ok; } MoveDetails_option;
@@ -37,6 +39,8 @@ struct MoveDetails {
   bool is_castle;
   int8_t promotion;
   bool is_en_passant;
+  bool is_check;
+  bool is_checkmate;
 
   inline diplomat::capi::MoveDetails AsFFI() const;
   inline static MoveDetails FromFFI(diplomat::capi::MoveDetails c_struct);
