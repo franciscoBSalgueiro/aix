@@ -9,6 +9,8 @@
 #include <optional>
 #include "diplomat_runtime.hpp"
 
+namespace diplomat::capi { struct MoveDetailsExtIterator; }
+class MoveDetailsExtIterator;
 namespace diplomat::capi { struct MoveDetailsIterator; }
 class MoveDetailsIterator;
 struct Bitboards;
@@ -40,7 +42,11 @@ public:
 
   inline static diplomat::result<size_t, DecodeError> recompress(diplomat::span<const uint8_t> data, uint8_t level, diplomat::span<uint8_t> out);
 
+  inline std::unique_ptr<MoveDetailsExtIterator> move_details_ext_iterator() const;
+
   inline std::unique_ptr<MoveDetailsIterator> move_details_iterator() const;
+
+  inline static bool is_valid_movedata(diplomat::span<const uint8_t> data);
 
   inline const diplomat::capi::Game* AsFFI() const;
   inline diplomat::capi::Game* AsFFI();

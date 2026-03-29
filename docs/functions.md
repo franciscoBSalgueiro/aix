@@ -6,7 +6,9 @@ The Aix extension provides several scalar functions in DuckDB that can be applie
 
 `board_at_position(movedata BLOB, position INTEGER) -> STRUCT(a1 VARCHAR, b1 VARCHAR, c1 VARCHAR, ..., h8 VARCHAR)`
 
-Returns the board at a given position as a struct. The starting position is 0. Negative integers are accepted, the final position is -1.
+Returns the board at a given position as a struct. The starting position is 0, so the final position is `ply_count`.
+
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
 
 ## clocks_to_move_times
@@ -36,7 +38,16 @@ Use `list_eval_to_centipawns` or `list_eval_to_mate` to apply these functions to
 
 `fen_at_position(movedata BLOB, position INTEGER) -> VARCHAR`
 
-Returns the FEN at a given position. The starting position is 0. Negative integers are accepted, the final position is -1.
+Returns the FEN at a given position. The starting position is 0, so the final position is `ply_count`.
+
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
+
+
+## is_valid_movedata
+
+`is_valid_movedata(movedata BLOB) -> BOOLEAN`
+
+Returns true if `movedata` represents a valid chess game, false otherwise.
 
 
 ## matches_subfen
@@ -48,20 +59,38 @@ A sub-FEN consists of only the piece placement part of a FEN (e.g. `8/8/p7/8/8/1
 and matches if a position contains at least those pieces.
 
 
-## move_details
+## matches_fen
 
-`move_details(movedata BLOB) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_en_passant BOOLEAN)[]`
+`matches_fen(movedata BLOB, fen VARCHAR) -> BOOLEAN`
+
+Returns true if any position in the game exactly matches a given the piece placement, castling rights,
+side to move, and en passant square of a given FEN.
+The move counters are ignored.
+Unlike `matches_subfen`, this requires an exact board match.
+
+
+## move_details(_ext)
+
+`move_details(BLOB) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)[]`
+
+`move_details_ext(BLOB) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN, legal_response_move_count UTINYINT)[]`
 
 Returns a list of details of all moves in the game. Note that lists in DuckDB are 1-indexed, so the first move is `move_details(...)[1]`.
 
+`move_details_ext` is significantly slower but includes the additional `is_stalemate` and `legal_response_move_count` fields. `legal_response_move_count` is the number of legal moves available to the opponent after the move (so `0` means checkmate or stalemate).
 
-## move_details_at
 
-`move_details(movedata BLOB, index INTEGER) -> STRUCT(ply USMALLINT, role VARCHAR, from VARCHAR, to VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_en_passant BOOLEAN)`
+## move_details(_ext)_at
+
+`move_details_at(BLOB, SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)`
+
+`move_details_ext_at(BLOB, SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN, legal_response_move_count UTINYINT)`
 
 Returns the details of a given move in the game. This function is 0-indexed, so the first move is `move_details_at(..., 0)`. This also means that `move_details_at(..., x) = move_details(...)[x + 1]`.
 
-Negative indices are accepted, the last move is -1.
+Negative indices are accepted, the last move is -1. However, it is faster to pass a positive index based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N`.
+
+`move_details_ext_at` is significantly slower but includes the additional `is_stalemate` and `legal_response_move_count` fields. `legal_response_move_count` is the number of legal moves available to the opponent after the move (so `0` means checkmate or stalemate).
 
 
 ## moved_pieces
@@ -80,16 +109,20 @@ Returns the moved pieces in order as a list, e.g. `[P, p, B, n, N, p, K, n, P, b
 
 ## piece_counts_at_position
 
-`piece_counts_at_position(movedata BLOB, position INTEGER) -> STRUCT(wK UTINYINT, wQ UTINYINT, wR UTINYINT, wB UTINYINT, wN UTINYINT, wP UTINYINT, bK UTINYINT, bQ UTINYINT, bR UTINYINT, bB UTINYINT, bN UTINYINT, bP UTINYINT)`
+`piece_counts_at_position(movedata BLOB, position INTEGER) -> STRUCT(wQ UTINYINT, wR UTINYINT, wB UTINYINT, wN UTINYINT, wP UTINYINT, bQ UTINYINT, bR UTINYINT, bB UTINYINT, bN UTINYINT, bP UTINYINT)`
 
-Returns the piece counts at a given position. The starting position is 0. Negative integers are accepted, the final position is -1.
+Returns the piece counts at a given position. The starting position is 0, so the final position is `ply_count`.
+
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
 
 ## pieces_at_position
 
 `pieces_at_position(movedata BLOB, position INTEGER) -> STRUCT(wK VARCHAR, wQ VARCHAR[], wR VARCHAR[], wB VARCHAR[], wN VARCHAR[], wP VARCHAR[], bK VARCHAR, bQ VARCHAR[], bR VARCHAR[], bB VARCHAR[], bN VARCHAR[], bP VARCHAR[])`
 
-Returns the squares where the pieces are on at a given position. The starting position is 0. Negative integers are accepted, the final position is -1.
+Returns the squares where the pieces are on at a given position. The starting position is 0, so the final position is `ply_count`.
+
+Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
 
 ## recompress
@@ -107,7 +140,7 @@ Returns true if a game matches a [Scoutfish](https://github.com/mcostalba/scoutf
 
 The behavior of Aix does not entirely match that of Scoutfish, and that is by design:
 
-* Aix does not support Scoutfish's `result` and `result-type` because this data is supposed to go in other columns (`movedata` does not have that data).
+* Aix does not support Scoutfish's `result` and `result-type` -- use the [`result`/`termination` columns](columns.md) and `is_checkmate`/`is_stalemate` from [`move_details_at`](#move_details_at).
 * Aix fixes [scoutfish#45](https://github.com/mcostalba/scoutfish/issues/45) and [scoutfish#56](https://github.com/mcostalba/scoutfish/issues/56).
 
 There are likely more differences. If Aix's output does not match expectations, please open an issue.

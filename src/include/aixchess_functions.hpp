@@ -6,11 +6,14 @@
 
 #include "rust/Game.hpp"
 #include "rust/Bitboards.hpp"
+#include "rust/Fen.hpp"
 #include "rust/Subfen.hpp"
 #include "rust/ScoutfishQuery.hpp"
 #include "rust/ScoutfishQueryParseError.hpp"
 #include "rust/MoveDetails.hpp"
+#include "rust/MoveDetailsExtended.hpp"
 #include "rust/MoveDetailsIterator.hpp"
+#include "rust/MoveDetailsExtIterator.hpp"
 #include "rust/DecodeError.hpp"
 #include "rust/diplomat_runtime.hpp"
 
@@ -23,6 +26,7 @@ void Register_PiecesAtPosition(ExtensionLoader &loader);
 void Register_PieceCountsAtPosition(ExtensionLoader &loader);
 void Register_BoardAtPosition(ExtensionLoader &loader);
 void Register_MatchesSubfen(ExtensionLoader &loader);
+void Register_MatchesFen(ExtensionLoader &loader);
 void Register_ScoutfishQuery(ExtensionLoader &loader);
 void Register_ClocksToMoveTimes(ExtensionLoader &loader);
 void Register_LichessTimeControl(ExtensionLoader &loader);
@@ -33,6 +37,7 @@ void Register_ToPgn(ExtensionLoader &loader);
 void Register_MovedPieces(ExtensionLoader &loader);
 void Register_MoveDetails(ExtensionLoader &loader);
 void Register_Recompress(ExtensionLoader &loader);
+void Register_IsValidMovedata(ExtensionLoader &loader);
 
 template <typename T>
 T UnwrapDecoded(diplomat::result<T, DecodeError> &&result, const char *function_name) {

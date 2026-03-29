@@ -33,6 +33,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	Register_PieceCountsAtPosition(loader);
 	Register_BoardAtPosition(loader);
 	Register_MatchesSubfen(loader);
+	Register_MatchesFen(loader);
 	Register_ScoutfishQuery(loader);
 	Register_ClocksToMoveTimes(loader);
 	Register_LichessTimeControl(loader);
@@ -43,6 +44,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	Register_MovedPieces(loader);
 	Register_MoveDetails(loader);
 	Register_Recompress(loader);
+	Register_IsValidMovedata(loader);
 
 	// Macros
 	for (idx_t index = 0; aixchess_macros[index].name != nullptr; index++) {

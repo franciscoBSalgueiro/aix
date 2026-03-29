@@ -1,7 +1,7 @@
-#ifndef MoveDetails_HPP
-#define MoveDetails_HPP
+#ifndef MoveDetailsExtended_HPP
+#define MoveDetailsExtended_HPP
 
-#include "MoveDetails.d.hpp"
+#include "MoveDetailsExtended.d.hpp"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -22,8 +22,8 @@ namespace capi {
 } // namespace
 
 
-inline diplomat::capi::MoveDetails MoveDetails::AsFFI() const {
-  return diplomat::capi::MoveDetails {
+inline diplomat::capi::MoveDetailsExtended MoveDetailsExtended::AsFFI() const {
+  return diplomat::capi::MoveDetailsExtended {
     /* .ply = */ ply,
     /* .role = */ role,
     /* .from = */ from,
@@ -34,11 +34,13 @@ inline diplomat::capi::MoveDetails MoveDetails::AsFFI() const {
     /* .is_en_passant = */ is_en_passant,
     /* .is_check = */ is_check,
     /* .is_checkmate = */ is_checkmate,
+    /* .is_stalemate = */ is_stalemate,
+    /* .legal_response_move_count = */ legal_response_move_count,
   };
 }
 
-inline MoveDetails MoveDetails::FromFFI(diplomat::capi::MoveDetails c_struct) {
-  return MoveDetails {
+inline MoveDetailsExtended MoveDetailsExtended::FromFFI(diplomat::capi::MoveDetailsExtended c_struct) {
+  return MoveDetailsExtended {
     /* .ply = */ c_struct.ply,
     /* .role = */ c_struct.role,
     /* .from = */ c_struct.from,
@@ -49,8 +51,10 @@ inline MoveDetails MoveDetails::FromFFI(diplomat::capi::MoveDetails c_struct) {
     /* .is_en_passant = */ c_struct.is_en_passant,
     /* .is_check = */ c_struct.is_check,
     /* .is_checkmate = */ c_struct.is_checkmate,
+    /* .is_stalemate = */ c_struct.is_stalemate,
+    /* .legal_response_move_count = */ c_struct.legal_response_move_count,
   };
 }
 
 
-#endif // MoveDetails_HPP
+#endif // MoveDetailsExtended_HPP

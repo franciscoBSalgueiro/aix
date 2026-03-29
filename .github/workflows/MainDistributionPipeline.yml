@@ -13,8 +13,8 @@ jobs:
     name: Build extension binaries
     uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.4-andium
     with:
-      duckdb_version: v1.4.4
-      ci_tools_version: v1.4-andium
+      duckdb_version: v1.5.1
+      ci_tools_version: v1.5-variegata
       extension_name: aixchess
       extra_toolchains: rust
       exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads'

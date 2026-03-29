@@ -1,52 +1,8 @@
-use aix_chess_compression::{CompressionLevel, Decode, Decoder, EncodedGame};
-use ffi::Bitboards;
-use shakmaty::{Board, Chess, Move};
+use aix_chess_compression::CompressionLevel;
 
 mod game;
 mod scoutfish;
 mod subfen;
-
-fn decode_bytes(bytes: &[u8]) -> Result<(Vec<Move>, Vec<Chess>), ffi::DecodeError> {
-    let encoded = EncodedGame::from_bytes(bytes).unwrap();
-    let decoder = Decoder::new(&encoded);
-    decoder
-        .decode_all_moves_and_positions()
-        .map_err(|e| e.into())
-}
-
-fn decode_bytes_positions(bytes: &[u8]) -> Result<Vec<Chess>, crate::ffi::DecodeError> {
-    let encoded = EncodedGame::from_bytes(bytes)?;
-    let decoder = Decoder::new(&encoded);
-    let result = decoder
-        .into_iter_positions()
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(result)
-}
-
-fn board_into_bitboards(board: &Board) -> Bitboards {
-    let white = board.white();
-    let black = board.black();
-    let kings = board.kings();
-    let queens = board.queens();
-    let rooks = board.rooks();
-    let bishops = board.bishops();
-    let knights = board.knights();
-    let pawns = board.pawns();
-    Bitboards {
-        w_k: (white & kings).0,
-        w_q: (white & queens).0,
-        w_r: (white & rooks).0,
-        w_b: (white & bishops).0,
-        w_n: (white & knights).0,
-        w_p: (white & pawns).0,
-        b_k: (black & kings).0,
-        b_q: (black & queens).0,
-        b_r: (black & rooks).0,
-        b_b: (black & bishops).0,
-        b_n: (black & knights).0,
-        b_p: (black & pawns).0,
-    }
-}
 
 const LEVELS: [CompressionLevel; 3] = [
     CompressionLevel::Low,
@@ -120,6 +76,21 @@ mod ffi {
         pub b_p: u64,
     }
 
+    pub struct MoveDetailsExtended {
+        pub ply: u16,
+        pub role: i8,
+        pub from: u8,
+        pub to: u8,
+        pub capture: i8,
+        pub is_castle: bool,
+        pub promotion: i8,
+        pub is_en_passant: bool,
+        pub is_check: bool,
+        pub is_checkmate: bool,
+        pub is_stalemate: bool,
+        pub legal_response_move_count: u8,
+    }
+
     pub struct MoveDetails {
         pub ply: u16,
         pub role: i8,
@@ -128,9 +99,9 @@ mod ffi {
         pub capture: i8,
         pub is_castle: bool,
         pub promotion: i8,
+        pub is_en_passant: bool,
         pub is_check: bool,
         pub is_checkmate: bool,
-        pub is_en_passant: bool,
     }
 
     pub enum DecodeError {
@@ -143,6 +114,11 @@ mod ffi {
 
     #[diplomat::opaque]
     pub struct Game<'a>(pub EncodedGame<'a>);
+
+    #[diplomat::opaque]
+    pub struct MoveDetailsExtIterator<'a>(
+        pub Box<dyn Iterator<Item = Result<MoveDetailsExtended, DecodeError>> + 'a>,
+    );
 
     #[diplomat::opaque]
     pub struct MoveDetailsIterator<'a>(
@@ -186,10 +162,44 @@ mod ffi {
             Ok(written)
         }
 
+        pub fn move_details_ext_iterator(&'a self) -> Box<MoveDetailsExtIterator<'a>> {
+            Box::new(MoveDetailsExtIterator::<'a>(Box::new(
+                crate::game::move_details_ext_iterator(&self.0),
+            )))
+        }
+
         pub fn move_details_iterator(&'a self) -> Box<MoveDetailsIterator<'a>> {
             Box::new(MoveDetailsIterator::<'a>(Box::new(
                 crate::game::move_details_iterator(&self.0),
             )))
+        }
+
+        pub fn is_valid_movedata(data: &[u8]) -> bool {
+            crate::game::is_valid_movedata(data)
+        }
+    }
+
+    impl<'a> MoveDetailsExtIterator<'a> {
+        pub fn next(&mut self) -> Result<MoveDetailsExtended, DecodeError> {
+            crate::optional_result_to_result(self.0.next())
+        }
+
+        pub fn nth(&mut self, n: i16) -> Result<MoveDetailsExtended, DecodeError> {
+            if n >= 0 {
+                crate::optional_result_to_result(self.0.nth(n as usize))
+            } else {
+                let mut collected = self
+                    .0
+                    .by_ref()
+                    .collect::<Result<Vec<MoveDetailsExtended>, DecodeError>>()?;
+                let i = collected.len() as i16 + n;
+                if i >= 0 {
+                    let result = collected.swap_remove(i as usize);
+                    Ok(result)
+                } else {
+                    Err(DecodeError::NoErrorNoValue)
+                }
+            }
         }
     }
 
@@ -237,6 +247,30 @@ mod ffi {
 
         pub fn matches(self, game: &[u8]) -> Result<bool, DecodeError> {
             crate::subfen::matches(self, game)
+        }
+    }
+
+    pub struct Fen {
+        pub white: u64,
+        pub black: u64,
+        pub king: u64,
+        pub queen: u64,
+        pub rook: u64,
+        pub bishop: u64,
+        pub knight: u64,
+        pub pawn: u64,
+        pub white_to_move: bool,
+        pub castling_rights: u64,
+        pub ep_square: i8,
+    }
+
+    impl Fen {
+        pub fn parse(fen: &DiplomatStr) -> Result<Fen, ()> {
+            crate::subfen::try_parse_fen(fen).map_err(|_| ())
+        }
+
+        pub fn matches_fen(self, game: &[u8]) -> Result<bool, DecodeError> {
+            crate::subfen::matches_fen(self, game)
         }
     }
 
