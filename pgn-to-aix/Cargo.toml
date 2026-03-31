@@ -11,7 +11,7 @@ repository = "https://github.com/thomas-daniels/aix"
 categories = ["compression", "encoding", "algorithms", "games"]
 
 [dependencies]
-aix-chess-compression = "0.1.1"
+aix-chess-compression = { path = "../aix-chess-compression" }
 duckdb = { version = "1.4", features = ["bundled"] }
 shakmaty = "0.30"
 pgn-reader = "0.29"

@@ -26,9 +26,15 @@ namespace capi {
     
     typedef struct ScoutfishQuery_matches_result {union {bool ok; diplomat::capi::DecodeError err;}; bool is_ok;} ScoutfishQuery_matches_result;
     ScoutfishQuery_matches_result ScoutfishQuery_matches(const diplomat::capi::ScoutfishQuery* self, diplomat::capi::DiplomatU8View game);
+
+    typedef struct ScoutfishQuery_matches_from_fen_result {union {bool ok; diplomat::capi::DecodeError err;}; bool is_ok;} ScoutfishQuery_matches_from_fen_result;
+    ScoutfishQuery_matches_from_fen_result ScoutfishQuery_matches_from_fen(const diplomat::capi::ScoutfishQuery* self, diplomat::capi::DiplomatU8View game, diplomat::capi::DiplomatStringView initial_fen);
     
     typedef struct ScoutfishQuery_matches_plies_result {union {uint32_t ok; diplomat::capi::DecodeError err;}; bool is_ok;} ScoutfishQuery_matches_plies_result;
     ScoutfishQuery_matches_plies_result ScoutfishQuery_matches_plies(const diplomat::capi::ScoutfishQuery* self, diplomat::capi::DiplomatU8View game, diplomat::capi::DiplomatU32ViewMut out);
+
+    typedef struct ScoutfishQuery_matches_plies_from_fen_result {union {uint32_t ok; diplomat::capi::DecodeError err;}; bool is_ok;} ScoutfishQuery_matches_plies_from_fen_result;
+    ScoutfishQuery_matches_plies_from_fen_result ScoutfishQuery_matches_plies_from_fen(const diplomat::capi::ScoutfishQuery* self, diplomat::capi::DiplomatU8View game, diplomat::capi::DiplomatStringView initial_fen, diplomat::capi::DiplomatU32ViewMut out);
     
     
     void ScoutfishQuery_destroy(ScoutfishQuery* self);
@@ -54,9 +60,24 @@ inline diplomat::result<bool, DecodeError> ScoutfishQuery::matches(diplomat::spa
   return result.is_ok ? diplomat::result<bool, DecodeError>(diplomat::Ok<bool>(result.ok)) : diplomat::result<bool, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
 
+inline diplomat::result<bool, DecodeError> ScoutfishQuery::matches_from_fen(diplomat::span<const uint8_t> game, std::string_view initial_fen) const {
+  auto result = diplomat::capi::ScoutfishQuery_matches_from_fen(this->AsFFI(),
+    {game.data(), game.size()},
+    {initial_fen.data(), initial_fen.size()});
+  return result.is_ok ? diplomat::result<bool, DecodeError>(diplomat::Ok<bool>(result.ok)) : diplomat::result<bool, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
 inline diplomat::result<uint32_t, DecodeError> ScoutfishQuery::matches_plies(diplomat::span<const uint8_t> game, diplomat::span<uint32_t> out) const {
   auto result = diplomat::capi::ScoutfishQuery_matches_plies(this->AsFFI(),
     {game.data(), game.size()},
+    {out.data(), out.size()});
+  return result.is_ok ? diplomat::result<uint32_t, DecodeError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
+inline diplomat::result<uint32_t, DecodeError> ScoutfishQuery::matches_plies_from_fen(diplomat::span<const uint8_t> game, std::string_view initial_fen, diplomat::span<uint32_t> out) const {
+  auto result = diplomat::capi::ScoutfishQuery_matches_plies_from_fen(this->AsFFI(),
+    {game.data(), game.size()},
+    {initial_fen.data(), initial_fen.size()},
     {out.data(), out.size()});
   return result.is_ok ? diplomat::result<uint32_t, DecodeError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }

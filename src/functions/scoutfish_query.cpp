@@ -78,7 +78,7 @@ static unique_ptr<FunctionData> ScoutfishQueryBindFunction(ClientContext &contex
 	}
 }
 
-template <bool PLIES>
+template <bool PLIES, bool FROM_FEN>
 inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
 	auto &info = func_expr.bind_info->Cast<ScoutfishQueryBindData>();
@@ -99,12 +99,20 @@ inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &resu
 	}
 	auto query = std::move(query_r).ok().value();
 
-	if constexpr (!PLIES) {
+	if constexpr (!PLIES && !FROM_FEN) {
 		UnaryExecutor::Execute<string_t, bool>(game_vector, result, count, [&](string_t game) {
 			diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
 			return UnwrapDecoded(query->matches(data), "scoutfish_query");
 		});
-	} else {
+	} else if constexpr (!PLIES && FROM_FEN) {
+		BinaryExecutor::Execute<string_t, string_t, bool>(
+		    args.data[0], args.data[2], result, count, [&](string_t game, string_t initial_fen) {
+			    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+			    return UnwrapDecoded(
+			        query->matches_from_fen(data, std::string_view(initial_fen.GetData(), initial_fen.GetSize())),
+			        "scoutfish_query");
+		    });
+	} else if constexpr (PLIES && !FROM_FEN) {
 		GenericExecutor::ExecuteUnary<PrimitiveType<string_t>, GenericListType<PrimitiveType<uint16_t>>>(
 		    game_vector, result, count, [&](PrimitiveType<string_t> game) {
 			    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
@@ -112,6 +120,51 @@ inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &resu
 			    uint32_t plies_data[plies_data_size] = {0};
 			    const auto query_result =
 			        UnwrapDecoded(query->matches_plies(data, {plies_data, 16}), "scoutfish_query_plies");
+
+			    const auto len = query_result & 0b1111111111111111;
+			    const auto min = static_cast<uint16_t>(query_result >> 16);
+
+			    GenericListType<PrimitiveType<uint16_t>> plies_list;
+			    auto added = 0;
+			    for (auto i = 0; i < plies_data_size; i++) {
+				    auto plies_data_curr = plies_data[i];
+				    if (plies_data_curr == 0) {
+					    continue;
+				    }
+
+#if __cplusplus >= 201907L
+				    auto start = std::countr_zero(plies_data_curr);
+				    auto end = 32 - std::countl_zero(plies_data_curr);
+#else
+					auto start = 0;
+					auto end = 32;
+#endif
+
+				    for (auto j = start; j < end; j++) {
+					    if (plies_data[i] & (1u << j)) {
+						    auto ply = static_cast<uint16_t>(i * 32 + j) + min;
+						    plies_list.values.push_back(PrimitiveType<uint16_t>(ply));
+						    added++;
+					    }
+				    }
+				    if (added >= len) {
+					    break;
+				    }
+			    }
+			    return plies_list;
+		    });
+	} else {
+		GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<string_t>,
+		                              GenericListType<PrimitiveType<uint16_t>>>(
+		    args.data[0], args.data[2], result, count,
+		    [&](PrimitiveType<string_t> game, PrimitiveType<string_t> initial_fen) {
+			    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+			    const auto plies_data_size = 16;
+			    uint32_t plies_data[plies_data_size] = {0};
+			    const auto query_result = UnwrapDecoded(
+			        query->matches_plies_from_fen(
+			            data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()), {plies_data, 16}),
+			        "scoutfish_query_plies");
 
 			    const auto len = query_result & 0b1111111111111111;
 			    const auto min = static_cast<uint16_t>(query_result >> 16);
@@ -153,13 +206,24 @@ inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &resu
 void Register_ScoutfishQuery(ExtensionLoader &loader) {
 	auto scoutfish_query_function =
 	    ScalarFunction("scoutfish_query", {LogicalType::BLOB, LogicalType::VARCHAR}, LogicalType::BOOLEAN,
-	                   ScoutfishQuery<false>, ScoutfishQueryBindFunction);
+	                   ScoutfishQuery<false, false>, ScoutfishQueryBindFunction);
 	loader.RegisterFunction(scoutfish_query_function);
+
+	auto scoutfish_query_from_fen_function =
+	    ScalarFunction("scoutfish_query", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
+	                   LogicalType::BOOLEAN, ScoutfishQuery<false, true>, ScoutfishQueryBindFunction);
+	loader.RegisterFunction(scoutfish_query_from_fen_function);
 
 	auto scoutfish_query_plies_function =
 	    ScalarFunction("scoutfish_query_plies", {LogicalType::BLOB, LogicalType::VARCHAR},
-	                   LogicalType::LIST(LogicalType::USMALLINT), ScoutfishQuery<true>, ScoutfishQueryBindFunction);
+	                   LogicalType::LIST(LogicalType::USMALLINT), ScoutfishQuery<true, false>, ScoutfishQueryBindFunction);
 	loader.RegisterFunction(scoutfish_query_plies_function);
+
+	auto scoutfish_query_plies_from_fen_function =
+	    ScalarFunction("scoutfish_query_plies", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
+	                   LogicalType::LIST(LogicalType::USMALLINT), ScoutfishQuery<true, true>,
+	                   ScoutfishQueryBindFunction);
+	loader.RegisterFunction(scoutfish_query_plies_from_fen_function);
 }
 
 } // namespace duckdb

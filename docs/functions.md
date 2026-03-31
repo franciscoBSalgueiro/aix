@@ -6,7 +6,11 @@ The Aix extension provides several scalar functions in DuckDB that can be applie
 
 `board_at_position(movedata BLOB, position INTEGER) -> STRUCT(a1 VARCHAR, b1 VARCHAR, c1 VARCHAR, ..., h8 VARCHAR)`
 
+`board_at_position(movedata BLOB, position INTEGER, initial_fen VARCHAR) -> STRUCT(a1 VARCHAR, b1 VARCHAR, c1 VARCHAR, ..., h8 VARCHAR)`
+
 Returns the board at a given position as a struct. The starting position is 0, so the final position is `ply_count`.
+
+When `initial_fen` is provided, decoding starts from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
@@ -38,7 +42,11 @@ Use `list_eval_to_centipawns` or `list_eval_to_mate` to apply these functions to
 
 `fen_at_position(movedata BLOB, position INTEGER) -> VARCHAR`
 
+`fen_at_position(movedata BLOB, position INTEGER, initial_fen VARCHAR) -> VARCHAR`
+
 Returns the FEN at a given position. The starting position is 0, so the final position is `ply_count`.
+
+When `initial_fen` is provided, decoding starts from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
@@ -47,44 +55,66 @@ Negative integers are accepted, the final position is -1. However, it is faster 
 
 `is_valid_movedata(movedata BLOB) -> BOOLEAN`
 
+`is_valid_movedata(movedata BLOB, initial_fen VARCHAR) -> BOOLEAN`
+
 Returns true if `movedata` represents a valid chess game, false otherwise.
+
+When `initial_fen` is provided, validation decodes from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## matches_subfen
 
 `matches_subfen(movedata BLOB, subfen VARCHAR) -> BOOLEAN`
 
+`matches_subfen(movedata BLOB, subfen VARCHAR, initial_fen VARCHAR) -> BOOLEAN`
+
 Returns true if any position in the game matches a given sub-FEN.
 A sub-FEN consists of only the piece placement part of a FEN (e.g. `8/8/p7/8/8/1B3N2/8/8`)
 and matches if a position contains at least those pieces.
+
+When `initial_fen` is provided, matching decodes from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## matches_fen
 
 `matches_fen(movedata BLOB, fen VARCHAR) -> BOOLEAN`
 
+`matches_fen(movedata BLOB, fen VARCHAR, initial_fen VARCHAR) -> BOOLEAN`
+
 Returns true if any position in the game exactly matches a given the piece placement, castling rights,
 side to move, and en passant square of a given FEN.
 The move counters are ignored.
 Unlike `matches_subfen`, this requires an exact board match.
+
+When `initial_fen` is provided, matching decodes from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## move_details(_ext)
 
 `move_details(BLOB) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)[]`
 
+`move_details(BLOB, initial_fen VARCHAR) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)[]`
+
 `move_details_ext(BLOB) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN, legal_response_move_count UTINYINT)[]`
+
+`move_details_ext(BLOB, initial_fen VARCHAR) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN, legal_response_move_count UTINYINT)[]`
 
 Returns a list of details of all moves in the game. Note that lists in DuckDB are 1-indexed, so the first move is `move_details(...)[1]`.
 
 `move_details_ext` is significantly slower but includes the additional `is_stalemate` and `legal_response_move_count` fields. `legal_response_move_count` is the number of legal moves available to the opponent after the move (so `0` means checkmate or stalemate).
+
+When `initial_fen` is provided, details are decoded from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## move_details(_ext)_at
 
 `move_details_at(BLOB, SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)`
 
+`move_details_at(BLOB, SMALLINT, initial_fen VARCHAR) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)`
+
 `move_details_ext_at(BLOB, SMALLINT) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN, legal_response_move_count UTINYINT)`
+
+`move_details_ext_at(BLOB, SMALLINT, initial_fen VARCHAR) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN, is_stalemate BOOLEAN, legal_response_move_count UTINYINT)`
 
 Returns the details of a given move in the game. This function is 0-indexed, so the first move is `move_details_at(..., 0)`. This also means that `move_details_at(..., x) = move_details(...)[x + 1]`.
 
@@ -92,26 +122,40 @@ Negative indices are accepted, the last move is -1. However, it is faster to pas
 
 `move_details_ext_at` is significantly slower but includes the additional `is_stalemate` and `legal_response_move_count` fields. `legal_response_move_count` is the number of legal moves available to the opponent after the move (so `0` means checkmate or stalemate).
 
+When `initial_fen` is provided, details are decoded from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
+
 
 ## moved_pieces
 
 `moved_pieces(movedata BLOB) -> VARCHAR`
 
+`moved_pieces(movedata BLOB, initial_fen VARCHAR) -> VARCHAR`
+
 Returns the moved pieces in order as a string, e.g. `PpBnNpKnPbBkNkQnQkQ`.
+
+When `initial_fen` is provided, decoding starts from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## moved_pieces_list
 
 `moved_pieces_list(movedata BLOB) -> VARCHAR[]`
 
+`moved_pieces_list(movedata BLOB, initial_fen VARCHAR) -> VARCHAR[]`
+
 Returns the moved pieces in order as a list, e.g. `[P, p, B, n, N, p, K, n, P, b, B, k, N, k, Q, n, Q, k, Q]`
+
+When `initial_fen` is provided, decoding starts from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## piece_counts_at_position
 
 `piece_counts_at_position(movedata BLOB, position INTEGER) -> STRUCT(wQ UTINYINT, wR UTINYINT, wB UTINYINT, wN UTINYINT, wP UTINYINT, bQ UTINYINT, bR UTINYINT, bB UTINYINT, bN UTINYINT, bP UTINYINT)`
 
+`piece_counts_at_position(movedata BLOB, position INTEGER, initial_fen VARCHAR) -> STRUCT(wQ UTINYINT, wR UTINYINT, wB UTINYINT, wN UTINYINT, wP UTINYINT, bQ UTINYINT, bR UTINYINT, bB UTINYINT, bN UTINYINT, bP UTINYINT)`
+
 Returns the piece counts at a given position. The starting position is 0, so the final position is `ply_count`.
+
+When `initial_fen` is provided, decoding starts from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
@@ -120,7 +164,11 @@ Negative integers are accepted, the final position is -1. However, it is faster 
 
 `pieces_at_position(movedata BLOB, position INTEGER) -> STRUCT(wK VARCHAR, wQ VARCHAR[], wR VARCHAR[], wB VARCHAR[], wN VARCHAR[], wP VARCHAR[], bK VARCHAR, bQ VARCHAR[], bR VARCHAR[], bB VARCHAR[], bN VARCHAR[], bP VARCHAR[])`
 
+`pieces_at_position(movedata BLOB, position INTEGER, initial_fen VARCHAR) -> STRUCT(wK VARCHAR, wQ VARCHAR[], wR VARCHAR[], wB VARCHAR[], wN VARCHAR[], wP VARCHAR[], bK VARCHAR, bQ VARCHAR[], bR VARCHAR[], bB VARCHAR[], bN VARCHAR[], bP VARCHAR[])`
+
 Returns the squares where the pieces are on at a given position. The starting position is 0, so the final position is `ply_count`.
+
+When `initial_fen` is provided, decoding starts from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
@@ -136,6 +184,8 @@ Recompress a game at a given compression level. Low is 0, medium is 1, high is 2
 
 `scoutfish_query(movedata BLOB, query VARCHAR) -> BOOLEAN`
 
+`scoutfish_query(movedata BLOB, query VARCHAR, initial_fen VARCHAR) -> BOOLEAN`
+
 Returns true if a game matches a [Scoutfish](https://github.com/mcostalba/scoutfish) query.
 
 The behavior of Aix does not entirely match that of Scoutfish, and that is by design:
@@ -145,11 +195,17 @@ The behavior of Aix does not entirely match that of Scoutfish, and that is by de
 
 There are likely more differences. If Aix's output does not match expectations, please open an issue.
 
+When `initial_fen` is provided, query matching decodes from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
+
 ## scoutfish_query_plies
 
 `scoutfish_query_plies(movedata BLOB, query VARCHAR) -> USMALLINT[]`
 
+`scoutfish_query_plies(movedata BLOB, query VARCHAR, initial_fen VARCHAR) -> USMALLINT[]`
+
 Like `scoutfish_query`, but returns the list of matching plies. The list is empty if the query does not match any move.
+
+When `initial_fen` is provided, query matching decodes from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## time_control_lichess
@@ -164,14 +220,22 @@ Possible return values: Ultrabullet, Bullet, Blitz, Rapid, Classical.
 
 `to_pgn(movedata BLOB) -> VARCHAR`
 
+`to_pgn(movedata BLOB, initial_fen VARCHAR) -> VARCHAR`
+
 Represents the game as a PGN string, e.g. `1. e4 e5 2. Bc4 Nc6 3. Nf3 b6 4. O-O Nf6 5. c3 Bc5 6. Bxf7+ Kxf7 7. Ng5+ Kg8 8. Qb3+`.
+
+When `initial_fen` is provided, decoding starts from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## to_uci
 
 `to_uci(movedata BLOB) -> VARCHAR`
 
+`to_uci(movedata BLOB, initial_fen VARCHAR) -> VARCHAR`
+
 Represents the game as a UCI string, e.g. `e2e4 e7e5 f1c4 b8c6 g1f3 b7b6 e1g1 g8f6 c2c3 f8c5 c4f7 e8f7 f3g5 f7g8 d1b3 f6d5 b3d5 g8f8 d5f7`.
+
+When `initial_fen` is provided, decoding starts from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
 ## winning_chances_lichess

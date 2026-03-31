@@ -108,6 +108,44 @@ inline void PiecesAtPosition(DataChunk &args, ExpressionState &state, Vector &re
 	    });
 }
 
+inline void PiecesAtPositionFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
+	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int32_t>, PrimitiveType<string_t>,
+	                                PiecesAtPositionResult>(
+	    args.data[0], args.data[1], args.data[2], result, args.size(),
+	    [&](PrimitiveType<string_t> game, PrimitiveType<int32_t> pos, PrimitiveType<string_t> initial_fen) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+		    auto bitboards_result = Game::pieces_at_position_from_fen(
+		        data, pos.val, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
+		    const auto bitboards_opt =
+		        UnwrapOptionalDecoded<Bitboards>(std::move(bitboards_result), "pieces_at_position");
+
+		    PiecesAtPositionResult res;
+
+		    if (!bitboards_opt.has_value()) {
+			    res.valid = false;
+			    return res;
+		    }
+
+		    res.valid = true;
+
+		    const Bitboards &bitboards = *bitboards_opt;
+
+		    res.wk_val = STR(BitboardToSquare(bitboards.w_k));
+		    BitboardToSquareList(bitboards.w_q, res.wq_val);
+		    BitboardToSquareList(bitboards.w_r, res.wr_val);
+		    BitboardToSquareList(bitboards.w_b, res.wb_val);
+		    BitboardToSquareList(bitboards.w_n, res.wn_val);
+		    BitboardToSquareList(bitboards.w_p, res.wp_val);
+		    res.bk_val = STR(BitboardToSquare(bitboards.b_k));
+		    BitboardToSquareList(bitboards.b_q, res.bq_val);
+		    BitboardToSquareList(bitboards.b_r, res.br_val);
+		    BitboardToSquareList(bitboards.b_b, res.bb_val);
+		    BitboardToSquareList(bitboards.b_n, res.bn_val);
+		    BitboardToSquareList(bitboards.b_p, res.bp_val);
+		    return res;
+	    });
+}
+
 } // namespace
 
 void Register_PiecesAtPosition(ExtensionLoader &loader) {
@@ -128,6 +166,11 @@ void Register_PiecesAtPosition(ExtensionLoader &loader) {
 	auto pieces_pos_function = ScalarFunction("pieces_at_position", {LogicalType::BLOB, LogicalType::INTEGER},
 	                                          LogicalType::STRUCT(piece_counts_children), PiecesAtPosition);
 	loader.RegisterFunction(pieces_pos_function);
+
+	auto pieces_pos_from_fen_function =
+	    ScalarFunction("pieces_at_position", {LogicalType::BLOB, LogicalType::INTEGER, LogicalType::VARCHAR},
+	                   LogicalType::STRUCT(piece_counts_children), PiecesAtPositionFromFen);
+	loader.RegisterFunction(pieces_pos_from_fen_function);
 }
 
 } // namespace duckdb

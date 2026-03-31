@@ -80,6 +80,30 @@ inline void MoveDetailsExtFn(DataChunk &args, ExpressionState &state, Vector &re
 	    });
 }
 
+inline void MoveDetailsExtFromFenFn(DataChunk &args, ExpressionState &state, Vector &result) {
+	const char *func_name = "move_details_ext";
+
+	GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<string_t>,
+	                              GenericListType<MoveDetailsStruct<false, MoveDetailsExtended>>>(
+	    args.data[0], args.data[1], result, args.size(),
+	    [&](PrimitiveType<string_t> game, PrimitiveType<string_t> initial_fen) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+
+		    auto game_obj_result = Game::from_bytes_from_fen(
+		        data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
+		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		    auto iter = game_obj->move_details_ext_iterator();
+		    GenericListType<MoveDetailsStruct<false, MoveDetailsExtended>> moves;
+		    while (auto opt = UnwrapOptionalDecoded(iter->next(), func_name)) {
+			    MoveDetailsStruct<false, MoveDetailsExtended> move;
+			    move.inner = *opt;
+			    moves.values.push_back(move);
+		    }
+
+		    return moves;
+	    });
+}
+
 inline void MoveDetailsFn(DataChunk &args, ExpressionState &state, Vector &result) {
 	const char *func_name = "move_details";
 
@@ -88,6 +112,30 @@ inline void MoveDetailsFn(DataChunk &args, ExpressionState &state, Vector &resul
 		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
 
 		    auto game_obj_result = Game::from_bytes(data);
+		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		    auto iter = game_obj->move_details_iterator();
+		    GenericListType<MoveDetailsStruct<false, MoveDetails>> moves;
+		    while (auto opt = UnwrapOptionalDecoded(iter->next(), func_name)) {
+			    MoveDetailsStruct<false, MoveDetails> move;
+			    move.inner = *opt;
+			    moves.values.push_back(move);
+		    }
+
+		    return moves;
+	    });
+}
+
+inline void MoveDetailsFromFenFn(DataChunk &args, ExpressionState &state, Vector &result) {
+	const char *func_name = "move_details";
+
+	GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<string_t>,
+	                              GenericListType<MoveDetailsStruct<false, MoveDetails>>>(
+	    args.data[0], args.data[1], result, args.size(),
+	    [&](PrimitiveType<string_t> game, PrimitiveType<string_t> initial_fen) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+
+		    auto game_obj_result = Game::from_bytes_from_fen(
+		        data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
 		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
 		    auto iter = game_obj->move_details_iterator();
 		    GenericListType<MoveDetailsStruct<false, MoveDetails>> moves;
@@ -125,6 +173,32 @@ inline void MoveDetailsExtAtFn(DataChunk &args, ExpressionState &state, Vector &
 	    });
 }
 
+inline void MoveDetailsExtAtFromFenFn(DataChunk &args, ExpressionState &state, Vector &result) {
+	const char *func_name = "move_details_ext_at";
+
+	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int16_t>, PrimitiveType<string_t>,
+	                               MoveDetailsStruct<true, MoveDetailsExtended>>(
+	    args.data[0], args.data[1], args.data[2], result, args.size(),
+	    [&](PrimitiveType<string_t> game, PrimitiveType<int16_t> ply, PrimitiveType<string_t> initial_fen) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+
+		    auto game_obj_result = Game::from_bytes_from_fen(
+		        data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
+		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		    auto iter = game_obj->move_details_ext_iterator();
+		    auto maybe_move_result = iter->nth(ply.val);
+		    auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), func_name);
+
+		    MoveDetailsStruct<true, MoveDetailsExtended> move;
+		    if (!maybe_move.has_value()) {
+			    move.valid = false;
+		    } else {
+			    move.inner = *maybe_move;
+		    }
+		    return move;
+	    });
+}
+
 inline void MoveDetailsAtFn(DataChunk &args, ExpressionState &state, Vector &result) {
 	const char *func_name = "move_details_at";
 
@@ -134,6 +208,32 @@ inline void MoveDetailsAtFn(DataChunk &args, ExpressionState &state, Vector &res
 		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
 
 		    auto game_obj_result = Game::from_bytes(data);
+		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		    auto iter = game_obj->move_details_iterator();
+		    auto maybe_move_result = iter->nth(ply.val);
+		    auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), func_name);
+
+		    MoveDetailsStruct<true, MoveDetails> move;
+		    if (!maybe_move.has_value()) {
+			    move.valid = false;
+		    } else {
+			    move.inner = *maybe_move;
+		    }
+		    return move;
+	    });
+}
+
+inline void MoveDetailsAtFromFenFn(DataChunk &args, ExpressionState &state, Vector &result) {
+	const char *func_name = "move_details_at";
+
+	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int16_t>, PrimitiveType<string_t>,
+	                               MoveDetailsStruct<true, MoveDetails>>(
+	    args.data[0], args.data[1], args.data[2], result, args.size(),
+	    [&](PrimitiveType<string_t> game, PrimitiveType<int16_t> ply, PrimitiveType<string_t> initial_fen) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+
+		    auto game_obj_result = Game::from_bytes_from_fen(
+		        data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
 		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
 		    auto iter = game_obj->move_details_iterator();
 		    auto maybe_move_result = iter->nth(ply.val);
@@ -183,18 +283,38 @@ void Register_MoveDetails(ExtensionLoader &loader) {
 	                   LogicalType::LIST(LogicalType::STRUCT(move_children_ext)), MoveDetailsExtFn);
 	loader.RegisterFunction(move_details_ext_function);
 
+	auto move_details_ext_from_fen_function =
+	    ScalarFunction("move_details_ext", {LogicalType::BLOB, LogicalType::VARCHAR},
+	                   LogicalType::LIST(LogicalType::STRUCT(move_children_ext)), MoveDetailsExtFromFenFn);
+	loader.RegisterFunction(move_details_ext_from_fen_function);
+
 	auto move_details_ext_at_function =
 	    ScalarFunction("move_details_ext_at", {LogicalType::BLOB, LogicalType::SMALLINT},
 	                   LogicalType::STRUCT(move_children_ext), MoveDetailsExtAtFn);
 	loader.RegisterFunction(move_details_ext_at_function);
 
+	auto move_details_ext_at_from_fen_function =
+	    ScalarFunction("move_details_ext_at", {LogicalType::BLOB, LogicalType::SMALLINT, LogicalType::VARCHAR},
+	                   LogicalType::STRUCT(move_children_ext), MoveDetailsExtAtFromFenFn);
+	loader.RegisterFunction(move_details_ext_at_from_fen_function);
+
 	auto move_details_function = ScalarFunction("move_details", {LogicalType::BLOB},
 	                                            LogicalType::LIST(LogicalType::STRUCT(move_children)), MoveDetailsFn);
 	loader.RegisterFunction(move_details_function);
 
+	auto move_details_from_fen_function =
+	    ScalarFunction("move_details", {LogicalType::BLOB, LogicalType::VARCHAR},
+	                   LogicalType::LIST(LogicalType::STRUCT(move_children)), MoveDetailsFromFenFn);
+	loader.RegisterFunction(move_details_from_fen_function);
+
 	auto move_details_at_function = ScalarFunction("move_details_at", {LogicalType::BLOB, LogicalType::SMALLINT},
 	                                               LogicalType::STRUCT(move_children), MoveDetailsAtFn);
 	loader.RegisterFunction(move_details_at_function);
+
+	auto move_details_at_from_fen_function =
+	    ScalarFunction("move_details_at", {LogicalType::BLOB, LogicalType::SMALLINT, LogicalType::VARCHAR},
+	                   LogicalType::STRUCT(move_children), MoveDetailsAtFromFenFn);
+	loader.RegisterFunction(move_details_at_from_fen_function);
 }
 
 } // namespace duckdb

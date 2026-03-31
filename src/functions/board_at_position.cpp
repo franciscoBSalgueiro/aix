@@ -50,6 +50,22 @@ inline void BoardAtPosition(DataChunk &args, ExpressionState &state, Vector &res
 	    });
 }
 
+inline void BoardAtPositionFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
+	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int32_t>, PrimitiveType<string_t>,
+	                                BoardStruct>(
+	    args.data[0], args.data[1], args.data[2], result, args.size(),
+	    [&](PrimitiveType<string_t> game, PrimitiveType<int32_t> pos, PrimitiveType<string_t> initial_fen) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+		    BoardStruct b;
+		    auto board_span = diplomat::span<int8_t>(b.board, 64);
+		    auto res = Game::board_at_position_from_fen(
+		        data, pos.val, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()), board_span);
+		    auto opt = UnwrapOptionalDecoded<std::monostate>(std::move(res), "board_at_position");
+		    b.valid = opt.has_value();
+		    return b;
+	    });
+}
+
 } // namespace
 
 void Register_BoardAtPosition(ExtensionLoader &loader) {
@@ -65,6 +81,11 @@ void Register_BoardAtPosition(ExtensionLoader &loader) {
 	auto board_pos_function = ScalarFunction("board_at_position", {LogicalType::BLOB, LogicalType::INTEGER},
 	                                         LogicalType::STRUCT(board_children), BoardAtPosition);
 	loader.RegisterFunction(board_pos_function);
+
+	auto board_pos_from_fen_function =
+	    ScalarFunction("board_at_position", {LogicalType::BLOB, LogicalType::INTEGER, LogicalType::VARCHAR},
+	                   LogicalType::STRUCT(board_children), BoardAtPositionFromFen);
+	loader.RegisterFunction(board_pos_from_fen_function);
 }
 
 } // namespace duckdb

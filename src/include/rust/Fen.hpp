@@ -23,6 +23,9 @@ namespace capi {
     typedef struct Fen_matches_fen_result {union {bool ok; diplomat::capi::DecodeError err;}; bool is_ok;} Fen_matches_fen_result;
     Fen_matches_fen_result Fen_matches_fen(diplomat::capi::Fen self, diplomat::capi::DiplomatU8View game);
 
+    typedef struct Fen_matches_fen_from_fen_result {union {bool ok; diplomat::capi::DecodeError err;}; bool is_ok;} Fen_matches_fen_from_fen_result;
+    Fen_matches_fen_from_fen_result Fen_matches_fen_from_fen(diplomat::capi::Fen self, diplomat::capi::DiplomatU8View game, diplomat::capi::DiplomatStringView initial_fen);
+
 
     } // extern "C"
 } // namespace capi
@@ -36,6 +39,13 @@ inline diplomat::result<Fen, std::monostate> Fen::parse(std::string_view fen) {
 inline diplomat::result<bool, DecodeError> Fen::matches_fen(diplomat::span<const uint8_t> game) {
   auto result = diplomat::capi::Fen_matches_fen(this->AsFFI(),
     {game.data(), game.size()});
+  return result.is_ok ? diplomat::result<bool, DecodeError>(diplomat::Ok<bool>(result.ok)) : diplomat::result<bool, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
+inline diplomat::result<bool, DecodeError> Fen::matches_fen_from_fen(diplomat::span<const uint8_t> game, std::string_view initial_fen) {
+  auto result = diplomat::capi::Fen_matches_fen_from_fen(this->AsFFI(),
+    {game.data(), game.size()},
+    {initial_fen.data(), initial_fen.size()});
   return result.is_ok ? diplomat::result<bool, DecodeError>(diplomat::Ok<bool>(result.ok)) : diplomat::result<bool, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
 

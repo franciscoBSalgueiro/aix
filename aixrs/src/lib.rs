@@ -113,7 +113,7 @@ mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct Game<'a>(pub EncodedGame<'a>);
+    pub struct Game<'a>(pub EncodedGame<'a>, pub Option<String>);
 
     #[diplomat::opaque]
     pub struct MoveDetailsExtIterator<'a>(
@@ -129,11 +129,30 @@ mod ffi {
         pub fn from_bytes(data: &'a [u8]) -> Result<Box<Self>, DecodeError> {
             crate::game::from_bytes(data)
         }
+
+        pub fn from_bytes_from_fen(data: &'a [u8], initial_fen: &str) -> Result<Box<Self>, DecodeError> {
+            crate::game::from_bytes_with_fen(data, initial_fen)
+        }
         pub fn pieces_at_position(data: &[u8], pos: i32) -> Result<Bitboards, DecodeError> {
             crate::game::pieces_at_position(data, pos)
         }
+        pub fn pieces_at_position_from_fen(
+            data: &[u8],
+            pos: i32,
+            initial_fen: &str,
+        ) -> Result<Bitboards, DecodeError> {
+            crate::game::pieces_at_position_with_fen(data, pos, Some(initial_fen))
+        }
         pub fn board_at_position(data: &[u8], pos: i32, out: &mut [i8]) -> Result<(), DecodeError> {
             crate::game::board_at_position(data, pos, out)
+        }
+        pub fn board_at_position_from_fen(
+            data: &[u8],
+            pos: i32,
+            initial_fen: &str,
+            out: &mut [i8],
+        ) -> Result<(), DecodeError> {
+            crate::game::board_at_position_with_fen(data, pos, out, Some(initial_fen))
         }
         pub fn fen_at_position(
             data: &[u8],
@@ -142,14 +161,43 @@ mod ffi {
         ) -> Result<(), DecodeError> {
             crate::game::fen_at_position(data, pos, out)
         }
+        pub fn fen_at_position_from_fen(
+            data: &[u8],
+            pos: i32,
+            initial_fen: &str,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), DecodeError> {
+            crate::game::fen_at_position_with_fen(data, pos, out, Some(initial_fen))
+        }
         pub fn to_uci_string(data: &[u8], out: &mut DiplomatWrite) -> Result<(), DecodeError> {
             crate::game::to_uci_string(data, out)
+        }
+        pub fn to_uci_string_from_fen(
+            data: &[u8],
+            initial_fen: &str,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), DecodeError> {
+            crate::game::to_uci_string_with_fen(data, out, Some(initial_fen))
         }
         pub fn to_pgn_string(data: &[u8], out: &mut DiplomatWrite) -> Result<(), DecodeError> {
             crate::game::to_pgn_string(data, out)
         }
+        pub fn to_pgn_string_from_fen(
+            data: &[u8],
+            initial_fen: &str,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), DecodeError> {
+            crate::game::to_pgn_string_with_fen(data, out, Some(initial_fen))
+        }
         pub fn moved_pieces(data: &[u8], out: &mut DiplomatWrite) -> Result<(), DecodeError> {
             crate::game::moved_pieces(data, out)
+        }
+        pub fn moved_pieces_from_fen(
+            data: &[u8],
+            initial_fen: &str,
+            out: &mut DiplomatWrite,
+        ) -> Result<(), DecodeError> {
+            crate::game::moved_pieces_with_fen(data, out, Some(initial_fen))
         }
 
         pub fn recompress(data: &[u8], level: u8, out: &mut [u8]) -> Result<usize, DecodeError> {
@@ -164,18 +212,21 @@ mod ffi {
 
         pub fn move_details_ext_iterator(&'a self) -> Box<MoveDetailsExtIterator<'a>> {
             Box::new(MoveDetailsExtIterator::<'a>(Box::new(
-                crate::game::move_details_ext_iterator(&self.0),
+                crate::game::move_details_ext_iterator_with_fen(&self.0, self.1.as_deref()),
             )))
         }
 
         pub fn move_details_iterator(&'a self) -> Box<MoveDetailsIterator<'a>> {
             Box::new(MoveDetailsIterator::<'a>(Box::new(
-                crate::game::move_details_iterator(&self.0),
+                crate::game::move_details_iterator_with_fen(&self.0, self.1.as_deref()),
             )))
         }
 
         pub fn is_valid_movedata(data: &[u8]) -> bool {
             crate::game::is_valid_movedata(data)
+        }
+        pub fn is_valid_movedata_from_fen(data: &[u8], initial_fen: &str) -> bool {
+            crate::game::is_valid_movedata_with_fen(data, Some(initial_fen))
         }
     }
 
@@ -248,6 +299,10 @@ mod ffi {
         pub fn matches(self, game: &[u8]) -> Result<bool, DecodeError> {
             crate::subfen::matches(self, game)
         }
+
+        pub fn matches_from_fen(self, game: &[u8], initial_fen: &str) -> Result<bool, DecodeError> {
+            crate::subfen::matches_with_initial_fen(self, game, Some(initial_fen))
+        }
     }
 
     pub struct Fen {
@@ -272,6 +327,14 @@ mod ffi {
         pub fn matches_fen(self, game: &[u8]) -> Result<bool, DecodeError> {
             crate::subfen::matches_fen(self, game)
         }
+
+        pub fn matches_fen_from_fen(
+            self,
+            game: &[u8],
+            initial_fen: &str,
+        ) -> Result<bool, DecodeError> {
+            crate::subfen::matches_fen_with_initial_fen(self, game, Some(initial_fen))
+        }
     }
 
     #[diplomat::opaque]
@@ -294,10 +357,40 @@ mod ffi {
             Ok(self.0.apply(&game, false)?.0)
         }
 
+        pub fn matches_from_fen(&self, game: &[u8], initial_fen: &str) -> Result<bool, DecodeError> {
+            let game = EncodedGame::from_bytes(game)?;
+            Ok(self.0.apply_with_initial_fen(&game, false, Some(initial_fen))?.0)
+        }
+
         pub fn matches_plies(&self, game: &[u8], out: &mut [u32]) -> Result<u32, DecodeError> {
             assert_eq!(out.len(), 16);
             let game = EncodedGame::from_bytes(game)?;
             if let Some(plies) = self.0.apply(&game, true)?.1 {
+                let len = plies.len() as u16;
+                let min = (plies[0] / 32) * 32;
+
+                for ply in plies {
+                    let ply = std::cmp::min(ply - min, 511);
+                    let index = (ply / 32) as usize;
+                    let bit = ply % 32;
+                    out[index] |= 1 << bit;
+                }
+
+                Ok((len as u32) | ((min as u32) << 16))
+            } else {
+                Ok(0)
+            }
+        }
+
+        pub fn matches_plies_from_fen(
+            &self,
+            game: &[u8],
+            initial_fen: &str,
+            out: &mut [u32],
+        ) -> Result<u32, DecodeError> {
+            assert_eq!(out.len(), 16);
+            let game = EncodedGame::from_bytes(game)?;
+            if let Some(plies) = self.0.apply_with_initial_fen(&game, true, Some(initial_fen))?.1 {
                 let len = plies.len() as u16;
                 let min = (plies[0] / 32) * 32;
 

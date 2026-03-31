@@ -68,12 +68,40 @@ inline void MatchesSubfen(DataChunk &args, ExpressionState &state, Vector &resul
 	});
 }
 
+inline void MatchesSubfenFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
+	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
+	auto &info = func_expr.bind_info->Cast<MatchesSubfenBindData>();
+
+	if (info.is_null) {
+		result.SetVectorType(VectorType::CONSTANT_VECTOR);
+		ConstantVector::SetNull(result, true);
+		return;
+	}
+
+	auto subfen = info.subfen;
+
+	BinaryExecutor::Execute<string_t, string_t, bool>(args.data[0], args.data[2], result, args.size(),
+	                                                 [&](string_t game, string_t initial_fen) {
+		                                                 diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+		                                                 return UnwrapDecoded<bool>(
+		                                                     subfen.matches_from_fen(
+		                                                         data,
+		                                                         std::string_view(initial_fen.GetData(), initial_fen.GetSize())),
+		                                                     "matches_subfen");
+	                                                 });
+}
+
 } // namespace
 
 void Register_MatchesSubfen(ExtensionLoader &loader) {
 	auto matches_subfen_function = ScalarFunction("matches_subfen", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                                              LogicalType::BOOLEAN, MatchesSubfen, MatchesSubfenBindFunction);
 	loader.RegisterFunction(matches_subfen_function);
+
+	auto matches_subfen_from_fen_function =
+	    ScalarFunction("matches_subfen", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
+	                   LogicalType::BOOLEAN, MatchesSubfenFromFen, MatchesSubfenBindFunction);
+	loader.RegisterFunction(matches_subfen_from_fen_function);
 }
 
 } // namespace duckdb

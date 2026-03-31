@@ -28,7 +28,11 @@ public:
 
   inline diplomat::result<bool, DecodeError> matches(diplomat::span<const uint8_t> game) const;
 
+  inline diplomat::result<bool, DecodeError> matches_from_fen(diplomat::span<const uint8_t> game, std::string_view initial_fen) const;
+
   inline diplomat::result<uint32_t, DecodeError> matches_plies(diplomat::span<const uint8_t> game, diplomat::span<uint32_t> out) const;
+
+  inline diplomat::result<uint32_t, DecodeError> matches_plies_from_fen(diplomat::span<const uint8_t> game, std::string_view initial_fen, diplomat::span<uint32_t> out) const;
 
   inline const diplomat::capi::ScoutfishQuery* AsFFI() const;
   inline diplomat::capi::ScoutfishQuery* AsFFI();
