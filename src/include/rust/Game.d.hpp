@@ -28,17 +28,31 @@ public:
 
   inline static diplomat::result<std::unique_ptr<Game>, DecodeError> from_bytes(diplomat::span<const uint8_t> data);
 
+  inline static diplomat::result<std::unique_ptr<Game>, DecodeError> from_bytes_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen);
+
   inline static diplomat::result<Bitboards, DecodeError> pieces_at_position(diplomat::span<const uint8_t> data, int32_t pos);
+
+  inline static diplomat::result<Bitboards, DecodeError> pieces_at_position_from_fen(diplomat::span<const uint8_t> data, int32_t pos, std::string_view initial_fen);
 
   inline static diplomat::result<std::monostate, DecodeError> board_at_position(diplomat::span<const uint8_t> data, int32_t pos, diplomat::span<int8_t> out);
 
+  inline static diplomat::result<std::monostate, DecodeError> board_at_position_from_fen(diplomat::span<const uint8_t> data, int32_t pos, std::string_view initial_fen, diplomat::span<int8_t> out);
+
   inline static diplomat::result<std::string, DecodeError> fen_at_position(diplomat::span<const uint8_t> data, int32_t pos);
+
+  inline static diplomat::result<std::string, DecodeError> fen_at_position_from_fen(diplomat::span<const uint8_t> data, int32_t pos, std::string_view initial_fen);
 
   inline static diplomat::result<std::string, DecodeError> to_uci_string(diplomat::span<const uint8_t> data);
 
+  inline static diplomat::result<std::string, DecodeError> to_uci_string_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen);
+
   inline static diplomat::result<std::string, DecodeError> to_pgn_string(diplomat::span<const uint8_t> data);
 
+  inline static diplomat::result<std::string, DecodeError> to_pgn_string_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen);
+
   inline static diplomat::result<std::string, DecodeError> moved_pieces(diplomat::span<const uint8_t> data);
+
+  inline static diplomat::result<std::string, DecodeError> moved_pieces_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen);
 
   inline static diplomat::result<size_t, DecodeError> recompress(diplomat::span<const uint8_t> data, uint8_t level, diplomat::span<uint8_t> out);
 
@@ -47,6 +61,8 @@ public:
   inline std::unique_ptr<MoveDetailsIterator> move_details_iterator() const;
 
   inline static bool is_valid_movedata(diplomat::span<const uint8_t> data);
+
+  inline static bool is_valid_movedata_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen);
 
   inline const diplomat::capi::Game* AsFFI() const;
   inline diplomat::capi::Game* AsFFI();

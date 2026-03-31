@@ -8,19 +8,21 @@ use shakmaty::{Chess, Move, Position, Square, uci::UciMove};
 
 pub struct NaiveEncoder {
     result: Vec<u8>,
+    _initial_position: Chess,
 }
 
 impl NaiveEncoder {
-    pub fn new() -> Self {
+    pub fn new(initial_position: Option<Chess>) -> Self {
         Self {
             result: Vec::with_capacity(40),
+            _initial_position: initial_position.unwrap_or_else(Chess::new),
         }
     }
 }
 
 impl Default for NaiveEncoder {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
@@ -69,20 +71,27 @@ impl Encode for NaiveEncoder {
 pub struct NaiveDecoder<'a> {
     encoded: &'a [u8],
     index: usize,
+    initial_position: Chess,
     chess: Chess,
 }
 
 impl<'a> NaiveDecoder<'a> {
-    pub(crate) fn new(encoded: &'a EncodedGameContent<'a>) -> Self {
+    pub(crate) fn new(encoded: &'a EncodedGameContent<'a>, initial_position: Option<Chess>) -> Self {
+        let initial_position = initial_position.unwrap_or_else(Chess::new);
         if let EncodedGameContent::Bytes(enc) = encoded {
             Self {
                 encoded: enc,
                 index: 0,
-                chess: Chess::new(),
+                chess: initial_position.clone(),
+                initial_position,
             }
         } else {
             panic!("NaiveDecoder only accepts EncodedGameRef::Bytes");
         }
+    }
+
+    pub(crate) fn initial_position(&self) -> &Chess {
+        &self.initial_position
     }
 }
 

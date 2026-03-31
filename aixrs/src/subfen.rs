@@ -53,8 +53,16 @@ fn subfen_from_board(board: &Board) -> Subfen {
 }
 
 pub fn matches(subfen: Subfen, game: &[u8]) -> Result<bool, crate::ffi::DecodeError> {
+    matches_with_initial_fen(subfen, game, None)
+}
+
+pub fn matches_with_initial_fen(
+    subfen: Subfen,
+    game: &[u8],
+    initial_fen: Option<&str>,
+) -> Result<bool, crate::ffi::DecodeError> {
     let encoded = EncodedGame::from_bytes(game)?;
-    let decoder = Decoder::new(&encoded);
+    let decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
     for position in decoder.into_iter_positions() {
         let position = position?;
         let board = position.board();
@@ -67,8 +75,16 @@ pub fn matches(subfen: Subfen, game: &[u8]) -> Result<bool, crate::ffi::DecodeEr
 }
 
 pub fn matches_fen(fen: Fen, game: &[u8]) -> Result<bool, crate::ffi::DecodeError> {
+    matches_fen_with_initial_fen(fen, game, None)
+}
+
+pub fn matches_fen_with_initial_fen(
+    fen: Fen,
+    game: &[u8],
+    initial_fen: Option<&str>,
+) -> Result<bool, crate::ffi::DecodeError> {
     let encoded = EncodedGame::from_bytes(game)?;
-    let decoder = Decoder::new(&encoded);
+    let decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
     let target_pawn_home = get_pawn_home_for_fen(&fen);
 
     for position in decoder.into_iter_positions() {

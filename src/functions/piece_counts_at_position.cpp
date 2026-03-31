@@ -52,6 +52,31 @@ inline void PieceCountsAtPosition(DataChunk &args, ExpressionState &state, Vecto
 	    });
 }
 
+inline void PieceCountsAtPositionFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
+	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int32_t>, PrimitiveType<string_t>,
+	                                PieceCountSquares>(
+	    args.data[0], args.data[1], args.data[2], result, args.size(),
+	    [&](PrimitiveType<string_t> game, PrimitiveType<int32_t> pos, PrimitiveType<string_t> initial_fen) {
+		    PieceCountSquares pcs;
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+
+		    auto bitboards_result = Game::pieces_at_position_from_fen(
+		        data, pos.val, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
+		    const auto bitboards_opt =
+		        UnwrapOptionalDecoded<Bitboards>(std::move(bitboards_result), "piece_counts_at_position");
+
+		    if (!bitboards_opt.has_value()) {
+			    pcs.valid = false;
+			    return pcs;
+		    }
+
+		    pcs.valid = true;
+		    pcs.bb = *bitboards_opt;
+
+		    return pcs;
+	    });
+}
+
 void Register_PieceCountsAtPosition(ExtensionLoader &loader) {
 	child_list_t<LogicalType> piece_counts_children;
 	piece_counts_children.push_back(std::make_pair("wQ", LogicalType::UTINYINT));
@@ -69,6 +94,11 @@ void Register_PieceCountsAtPosition(ExtensionLoader &loader) {
 	    ScalarFunction("piece_counts_at_position", {LogicalType::BLOB, LogicalType::INTEGER},
 	                   LogicalType::STRUCT(piece_counts_children), PieceCountsAtPosition);
 	loader.RegisterFunction(piece_counts_pos_function);
+
+	auto piece_counts_pos_from_fen_function =
+	    ScalarFunction("piece_counts_at_position", {LogicalType::BLOB, LogicalType::INTEGER, LogicalType::VARCHAR},
+	                   LogicalType::STRUCT(piece_counts_children), PieceCountsAtPositionFromFen);
+	loader.RegisterFunction(piece_counts_pos_from_fen_function);
 }
 
 } // namespace duckdb

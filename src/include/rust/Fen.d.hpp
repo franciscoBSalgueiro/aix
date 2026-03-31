@@ -50,6 +50,8 @@ struct Fen {
 
   inline diplomat::result<bool, DecodeError> matches_fen(diplomat::span<const uint8_t> game);
 
+  inline diplomat::result<bool, DecodeError> matches_fen_from_fen(diplomat::span<const uint8_t> game, std::string_view initial_fen);
+
   inline diplomat::capi::Fen AsFFI() const;
   inline static Fen FromFFI(diplomat::capi::Fen c_struct);
 };

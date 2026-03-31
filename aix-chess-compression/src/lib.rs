@@ -1,6 +1,7 @@
 use chess_huffman::EncodedGame as BitsEncodedGame;
 use shakmaty::{
-    Chess, Move,
+    CastlingMode, Chess, FromSetup, Move,
+    fen::Fen as ShakmatyFen,
     san::{San, SanPlus, Suffix},
     uci::UciMove,
 };
@@ -16,6 +17,19 @@ mod naive;
 use compactindex::{CompactIndexDecoder, CompactIndexEncoder};
 use huffman::{HuffDecoder, HuffEncoder};
 use naive::{NaiveDecoder, NaiveEncoder};
+
+fn parse_initial_position(initial_fen: Option<&str>) -> Result<Option<Chess>, ()> {
+    let Some(initial_fen) = initial_fen else {
+        return Ok(None);
+    };
+
+    let parsed = ShakmatyFen::from_ascii(initial_fen.as_bytes()).map_err(|_| ())?;
+    let setup = parsed.as_setup();
+    let castling_mode = CastlingMode::detect(setup);
+    let position = Chess::from_setup(setup.clone(), castling_mode).map_err(|_| ())?;
+
+    Ok(Some(position))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -93,6 +107,11 @@ impl From<chess_huffman::EncodedGameConstructionError> for EncodedGameConstructi
 }
 
 impl<'a> EncodedGame<'a> {
+    #[must_use]
+    pub fn compression_level(&self) -> CompressionLevel {
+        self.compression_level
+    }
+
     /// Converts an encoded game into bytes. Use `from_bytes` to reconstruct.
     #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
@@ -175,10 +194,23 @@ impl Encoder<'_> {
     /// Creates a new encoder for the specified compression level.
     #[must_use]
     pub fn new(compression_level: CompressionLevel) -> Self {
+        Self::new_with_initial_fen(compression_level, None)
+            .expect("None as initial FEN should always be valid")
+    }
+
+    /// Creates a new encoder for the specified compression level and optional initial FEN.
+    pub fn new_with_initial_fen(
+        compression_level: CompressionLevel,
+        initial_fen: Option<&str>,
+    ) -> Result<Self, EncodeError> {
         match compression_level {
-            CompressionLevel::Low => Encoder::Naive(NaiveEncoder::new()),
-            CompressionLevel::Medium => Encoder::CompactIndex(CompactIndexEncoder::new()),
-            CompressionLevel::High => Encoder::Huffman(HuffEncoder::new()),
+            CompressionLevel::Low => {
+                let initial_position = parse_initial_position(initial_fen)
+                    .map_err(|_| EncodeError::from_inner("invalid initial FEN"))?;
+                Ok(Encoder::Naive(NaiveEncoder::new(initial_position)))
+            }
+            CompressionLevel::Medium => Ok(Encoder::CompactIndex(CompactIndexEncoder::new())),
+            CompressionLevel::High => Ok(Encoder::Huffman(HuffEncoder::new())),
         }
     }
 }
@@ -218,12 +250,33 @@ impl<'a> Decoder<'a> {
     /// Creates a new decoder for an encoded game.
     #[must_use]
     pub fn new(encoded: &'a EncodedGame) -> Self {
+        Self::new_with_initial_fen(encoded, None).expect("None as initial FEN should always be valid")
+    }
+
+    /// Creates a new decoder for an encoded game and optional initial FEN.
+    pub fn new_with_initial_fen(
+        encoded: &'a EncodedGame,
+        initial_fen: Option<&str>,
+    ) -> DecodeResult<Self> {
         match encoded.compression_level {
-            CompressionLevel::Low => Decoder::Naive(NaiveDecoder::new(&encoded.content)),
-            CompressionLevel::Medium => {
-                Decoder::CompactIndex(CompactIndexDecoder::new(&encoded.content))
+            CompressionLevel::Low => {
+                let initial_position = parse_initial_position(initial_fen).map_err(|_| DecodeError {})?;
+                Ok(Decoder::Naive(NaiveDecoder::new(
+                    &encoded.content,
+                    initial_position,
+                )))
             }
-            CompressionLevel::High => Decoder::Huffman(HuffDecoder::new(&encoded.content)),
+            CompressionLevel::Medium => {
+                Ok(Decoder::CompactIndex(CompactIndexDecoder::new(&encoded.content)))
+            }
+            CompressionLevel::High => Ok(Decoder::Huffman(HuffDecoder::new(&encoded.content))),
+        }
+    }
+
+    fn initial_position(&self) -> Chess {
+        match self {
+            Decoder::Naive(decoder) => decoder.initial_position().clone(),
+            Decoder::CompactIndex(_) | Decoder::Huffman(_) => Chess::new(),
         }
     }
 
@@ -250,7 +303,7 @@ impl<'a> Decoder<'a> {
         Self: Sized,
     {
         let mut s = String::new();
-        let mut pos = Chess::new();
+        let mut pos = self.initial_position();
         let mut first = true;
         let mut i = 2;
         for r in self.into_iter_moves_and_positions() {
@@ -463,7 +516,10 @@ pub type DecodeResult<T> = Result<T, DecodeError>;
 #[cfg(test)]
 mod tests {
     use quickcheck_macros::quickcheck;
-    use shakmaty::{Chess, Move, Position};
+    use shakmaty::{
+        CastlingMode, Chess, FromSetup, Move, Position,
+        fen::Fen as ShakmatyFen,
+    };
 
     use crate::Decode;
 
@@ -552,5 +608,35 @@ mod tests {
             Err(_) => {}
         }
         true
+    }
+
+    #[test]
+    fn low_custom_fen_roundtrip() {
+        let fen = "7k/8/8/8/8/8/8/K7 w - - 0 1";
+        let parsed = ShakmatyFen::from_ascii(fen.as_bytes()).unwrap();
+        let setup = parsed.as_setup();
+        let castling_mode = CastlingMode::detect(setup);
+        let mut pos = Chess::from_setup(setup.clone(), castling_mode).unwrap();
+
+        let mut moves = vec![];
+        for _ in 0..3 {
+            let legal_moves = pos.legal_moves();
+            let m = legal_moves[0];
+            pos.play_unchecked(m);
+            moves.push(m);
+        }
+
+        let mut encoder = Encoder::new_with_initial_fen(CompressionLevel::Low, Some(fen)).unwrap();
+        for m in &moves {
+            encoder.encode_move(*m).unwrap();
+        }
+        let encoded = encoder.finish();
+
+        let decoder = Decoder::new_with_initial_fen(&encoded, Some(fen)).unwrap();
+        let decoded_moves: Vec<Move> = decoder.into_iter_moves().map(|m| m.unwrap()).collect();
+        assert_eq!(decoded_moves, moves);
+
+        let mut wrong_decoder = Decoder::new(&encoded);
+        assert!(wrong_decoder.next_move().unwrap().is_err());
     }
 }

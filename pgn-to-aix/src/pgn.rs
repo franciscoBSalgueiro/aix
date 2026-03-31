@@ -3,7 +3,7 @@ use duckdb::{Appender, params};
 use lazy_regex::regex_captures;
 use pgn_reader::{SanPlus, Skip, Visitor};
 use shakmaty::san::San;
-use shakmaty::{Chess, Position};
+use shakmaty::{CastlingMode, Chess, FromSetup, Position, fen::Fen as ShakmatyFen};
 use std::collections::HashMap;
 use std::ops::ControlFlow;
 
@@ -40,9 +40,16 @@ pub struct LichessHeaders {
     tournament: Option<String>,
     utc_date: Option<String>,
     utc_time: Option<String>,
+    setup: bool,
+    fen: Option<String>,
 }
 
-pub type CustomHeaders = HashMap<String, String>;
+#[derive(Default, Debug)]
+pub struct CustomHeaders {
+    headers: HashMap<String, String>,
+    setup: bool,
+    fen: Option<String>,
+}
 
 impl<'a> PgnProcessor<'a> {
     pub fn new(
@@ -77,13 +84,20 @@ pub struct GameInProcessing<'a> {
 
 impl GameInProcessing<'_> {
     fn new(headers: Headers, level: CompressionLevel) -> Self {
+        let initial_fen = extract_initial_fen(&headers).map(ToOwned::to_owned);
+        let pos = match initial_fen.as_deref() {
+            Some(fen) => chess_from_fen(fen).unwrap_or_else(|e| panic!("invalid initial FEN in PGN tags: {e}")),
+            None => Chess::new(),
+        };
+
         GameInProcessing {
             headers,
-            encoder: Encoder::new(level),
+            encoder: Encoder::new_with_initial_fen(level, initial_fen.as_deref())
+                .unwrap_or_else(|e| panic!("failed to initialize encoder with initial FEN: {e}")),
             evals: vec![],
             clocks_white: vec![],
             clocks_black: vec![],
-            pos: Chess::new(),
+            pos,
             ply: 0,
         }
     }
@@ -144,7 +158,7 @@ impl<'a> Visitor for PgnProcessor<'a> {
 
     fn begin_tags(&mut self) -> ControlFlow<Self::Output, Self::Tags> {
         ControlFlow::Continue(match &self.header_list {
-            Some(_) => Headers::Custom(CustomHeaders::new()),
+            Some(_) => Headers::Custom(CustomHeaders::default()),
             None => Headers::Lichess(LichessHeaders::default()),
         })
     }
@@ -180,15 +194,10 @@ impl<'a> Visitor for PgnProcessor<'a> {
                 if self.continue_on_invalid_move {
                     eprintln!("{error_msg}");
 
-                    let mut swap = GameInProcessing {
-                        headers: Headers::Custom(CustomHeaders::new()),
-                        encoder: Encoder::new(CompressionLevel::Low),
-                        evals: vec![],
-                        clocks_white: vec![],
-                        clocks_black: vec![],
-                        pos: Chess::new(),
-                        ply: 0,
-                    };
+                    let mut swap = GameInProcessing::new(
+                        Headers::Custom(CustomHeaders::default()),
+                        CompressionLevel::Low,
+                    );
 
                     std::mem::swap(&mut swap, movetext);
                     self.end_game_inner(swap);
@@ -223,11 +232,17 @@ impl<'a> Visitor for PgnProcessor<'a> {
         value: pgn_reader::RawTag<'_>,
     ) -> ControlFlow<Self::Output> {
         match tags {
-            Headers::Custom(custom_headers) => {
+            Headers::Custom(custom) => {
                 let header_list = self.header_list.as_ref().unwrap();
                 let key_str = String::from_utf8_lossy(key).into_owned().to_lowercase();
+                let value_str = value.decode_utf8_lossy().into_owned();
+                match key {
+                    b"SetUp" => custom.setup = value_str == "1",
+                    b"FEN" => custom.fen = Some(value_str.clone()),
+                    _ => {}
+                }
                 if header_list.contains(&key_str) {
-                    custom_headers.insert(key_str, value.decode_utf8_lossy().into_owned());
+                    custom.headers.insert(key_str, value_str);
                 }
             }
             Headers::Lichess(lichess_tags) => match key {
@@ -269,6 +284,8 @@ impl<'a> Visitor for PgnProcessor<'a> {
                 }
                 b"UTCDate" => lichess_tags.utc_date = Some(value.decode_utf8_lossy().into_owned()),
                 b"UTCTime" => lichess_tags.utc_time = Some(value.decode_utf8_lossy().into_owned()),
+                b"SetUp" => lichess_tags.setup = value.decode_utf8_lossy() == "1",
+                b"FEN" => lichess_tags.fen = Some(value.decode_utf8_lossy().into_owned()),
                 _ => {}
             },
         }
@@ -342,14 +359,14 @@ impl<'a> PgnProcessor<'a> {
                     }),
                 ])
                 .unwrap(),
-            Headers::Custom(headers) => {
+            Headers::Custom(custom) => {
                 let mut params_vec: Vec<Box<dyn duckdb::ToSql>> = vec![];
                 for header in self
                     .header_list
                     .as_ref()
                     .expect("header_list cannot be None for Custom headers")
                 {
-                    params_vec.push(Box::new(headers.get(header)));
+                    params_vec.push(Box::new(custom.headers.get(header)));
                 }
 
                 params_vec.push(Box::new(bytes));
@@ -369,6 +386,32 @@ impl<'a> PgnProcessor<'a> {
             println!("{} done", self.count);
         }
     }
+}
+
+fn extract_initial_fen(headers: &Headers) -> Option<&str> {
+    match headers {
+        Headers::Lichess(lichess) => {
+            if lichess.setup {
+                lichess.fen.as_deref()
+            } else {
+                None
+            }
+        }
+        Headers::Custom(custom) => {
+            if custom.setup {
+                custom.fen.as_deref()
+            } else {
+                None
+            }
+        }
+    }
+}
+
+fn chess_from_fen(fen: &str) -> Result<Chess, String> {
+    let parsed = ShakmatyFen::from_ascii(fen.as_bytes()).map_err(|e| e.to_string())?;
+    let setup = parsed.as_setup();
+    let castling_mode = CastlingMode::detect(setup);
+    Chess::from_setup(setup.clone(), castling_mode).map_err(|_| "invalid FEN setup".to_owned())
 }
 
 fn extract_eval_cp_from_comment(comment: &str) -> Option<i16> {

@@ -22,24 +22,45 @@ namespace capi {
     
     typedef struct Game_from_bytes_result {union {diplomat::capi::Game* ok; diplomat::capi::DecodeError err;}; bool is_ok;} Game_from_bytes_result;
     Game_from_bytes_result Game_from_bytes(diplomat::capi::DiplomatU8View data);
+
+    typedef struct Game_from_bytes_from_fen_result {union {diplomat::capi::Game* ok; diplomat::capi::DecodeError err;}; bool is_ok;} Game_from_bytes_from_fen_result;
+    Game_from_bytes_from_fen_result Game_from_bytes_from_fen(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatStringView initial_fen);
     
     typedef struct Game_pieces_at_position_result {union {diplomat::capi::Bitboards ok; diplomat::capi::DecodeError err;}; bool is_ok;} Game_pieces_at_position_result;
     Game_pieces_at_position_result Game_pieces_at_position(diplomat::capi::DiplomatU8View data, int32_t pos);
+
+    typedef struct Game_pieces_at_position_from_fen_result {union {diplomat::capi::Bitboards ok; diplomat::capi::DecodeError err;}; bool is_ok;} Game_pieces_at_position_from_fen_result;
+    Game_pieces_at_position_from_fen_result Game_pieces_at_position_from_fen(diplomat::capi::DiplomatU8View data, int32_t pos, diplomat::capi::DiplomatStringView initial_fen);
     
     typedef struct Game_board_at_position_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_board_at_position_result;
     Game_board_at_position_result Game_board_at_position(diplomat::capi::DiplomatU8View data, int32_t pos, diplomat::capi::DiplomatI8ViewMut out);
+
+    typedef struct Game_board_at_position_from_fen_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_board_at_position_from_fen_result;
+    Game_board_at_position_from_fen_result Game_board_at_position_from_fen(diplomat::capi::DiplomatU8View data, int32_t pos, diplomat::capi::DiplomatStringView initial_fen, diplomat::capi::DiplomatI8ViewMut out);
     
     typedef struct Game_fen_at_position_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_fen_at_position_result;
     Game_fen_at_position_result Game_fen_at_position(diplomat::capi::DiplomatU8View data, int32_t pos, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Game_fen_at_position_from_fen_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_fen_at_position_from_fen_result;
+    Game_fen_at_position_from_fen_result Game_fen_at_position_from_fen(diplomat::capi::DiplomatU8View data, int32_t pos, diplomat::capi::DiplomatStringView initial_fen, diplomat::capi::DiplomatWrite* write);
     
     typedef struct Game_to_uci_string_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_to_uci_string_result;
     Game_to_uci_string_result Game_to_uci_string(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Game_to_uci_string_from_fen_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_to_uci_string_from_fen_result;
+    Game_to_uci_string_from_fen_result Game_to_uci_string_from_fen(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatStringView initial_fen, diplomat::capi::DiplomatWrite* write);
     
     typedef struct Game_to_pgn_string_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_to_pgn_string_result;
     Game_to_pgn_string_result Game_to_pgn_string(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Game_to_pgn_string_from_fen_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_to_pgn_string_from_fen_result;
+    Game_to_pgn_string_from_fen_result Game_to_pgn_string_from_fen(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatStringView initial_fen, diplomat::capi::DiplomatWrite* write);
     
     typedef struct Game_moved_pieces_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_moved_pieces_result;
     Game_moved_pieces_result Game_moved_pieces(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatWrite* write);
+
+    typedef struct Game_moved_pieces_from_fen_result {union { diplomat::capi::DecodeError err;}; bool is_ok;} Game_moved_pieces_from_fen_result;
+    Game_moved_pieces_from_fen_result Game_moved_pieces_from_fen(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatStringView initial_fen, diplomat::capi::DiplomatWrite* write);
     
     typedef struct Game_recompress_result {union {size_t ok; diplomat::capi::DecodeError err;}; bool is_ok;} Game_recompress_result;
     Game_recompress_result Game_recompress(diplomat::capi::DiplomatU8View data, uint8_t level, diplomat::capi::DiplomatU8ViewMut out);
@@ -49,6 +70,8 @@ namespace capi {
     diplomat::capi::MoveDetailsIterator* Game_move_details_iterator(const diplomat::capi::Game* self);
     
     bool Game_is_valid_movedata(diplomat::capi::DiplomatU8View data);
+
+    bool Game_is_valid_movedata_from_fen(diplomat::capi::DiplomatU8View data, diplomat::capi::DiplomatStringView initial_fen);
     
     
     void Game_destroy(Game* self);
@@ -62,15 +85,36 @@ inline diplomat::result<std::unique_ptr<Game>, DecodeError> Game::from_bytes(dip
   return result.is_ok ? diplomat::result<std::unique_ptr<Game>, DecodeError>(diplomat::Ok<std::unique_ptr<Game>>(std::unique_ptr<Game>(Game::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Game>, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::unique_ptr<Game>, DecodeError> Game::from_bytes_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen) {
+  auto result = diplomat::capi::Game_from_bytes_from_fen({data.data(), data.size()},
+    {initial_fen.data(), initial_fen.size()});
+  return result.is_ok ? diplomat::result<std::unique_ptr<Game>, DecodeError>(diplomat::Ok<std::unique_ptr<Game>>(std::unique_ptr<Game>(Game::FromFFI(result.ok)))) : diplomat::result<std::unique_ptr<Game>, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
 inline diplomat::result<Bitboards, DecodeError> Game::pieces_at_position(diplomat::span<const uint8_t> data, int32_t pos) {
   auto result = diplomat::capi::Game_pieces_at_position({data.data(), data.size()},
     pos);
   return result.is_ok ? diplomat::result<Bitboards, DecodeError>(diplomat::Ok<Bitboards>(Bitboards::FromFFI(result.ok))) : diplomat::result<Bitboards, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
 
+inline diplomat::result<Bitboards, DecodeError> Game::pieces_at_position_from_fen(diplomat::span<const uint8_t> data, int32_t pos, std::string_view initial_fen) {
+  auto result = diplomat::capi::Game_pieces_at_position_from_fen({data.data(), data.size()},
+    pos,
+    {initial_fen.data(), initial_fen.size()});
+  return result.is_ok ? diplomat::result<Bitboards, DecodeError>(diplomat::Ok<Bitboards>(Bitboards::FromFFI(result.ok))) : diplomat::result<Bitboards, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
 inline diplomat::result<std::monostate, DecodeError> Game::board_at_position(diplomat::span<const uint8_t> data, int32_t pos, diplomat::span<int8_t> out) {
   auto result = diplomat::capi::Game_board_at_position({data.data(), data.size()},
     pos,
+    {out.data(), out.size()});
+  return result.is_ok ? diplomat::result<std::monostate, DecodeError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::monostate, DecodeError> Game::board_at_position_from_fen(diplomat::span<const uint8_t> data, int32_t pos, std::string_view initial_fen, diplomat::span<int8_t> out) {
+  auto result = diplomat::capi::Game_board_at_position_from_fen({data.data(), data.size()},
+    pos,
+    {initial_fen.data(), initial_fen.size()},
     {out.data(), out.size()});
   return result.is_ok ? diplomat::result<std::monostate, DecodeError>(diplomat::Ok<std::monostate>()) : diplomat::result<std::monostate, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
@@ -84,10 +128,29 @@ inline diplomat::result<std::string, DecodeError> Game::fen_at_position(diplomat
   return result.is_ok ? diplomat::result<std::string, DecodeError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::string, DecodeError> Game::fen_at_position_from_fen(diplomat::span<const uint8_t> data, int32_t pos, std::string_view initial_fen) {
+  std::string output;
+  diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+  auto result = diplomat::capi::Game_fen_at_position_from_fen({data.data(), data.size()},
+    pos,
+    {initial_fen.data(), initial_fen.size()},
+    &write);
+  return result.is_ok ? diplomat::result<std::string, DecodeError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
 inline diplomat::result<std::string, DecodeError> Game::to_uci_string(diplomat::span<const uint8_t> data) {
   std::string output;
   diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
   auto result = diplomat::capi::Game_to_uci_string({data.data(), data.size()},
+    &write);
+  return result.is_ok ? diplomat::result<std::string, DecodeError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, DecodeError> Game::to_uci_string_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen) {
+  std::string output;
+  diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+  auto result = diplomat::capi::Game_to_uci_string_from_fen({data.data(), data.size()},
+    {initial_fen.data(), initial_fen.size()},
     &write);
   return result.is_ok ? diplomat::result<std::string, DecodeError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
@@ -100,10 +163,28 @@ inline diplomat::result<std::string, DecodeError> Game::to_pgn_string(diplomat::
   return result.is_ok ? diplomat::result<std::string, DecodeError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
 
+inline diplomat::result<std::string, DecodeError> Game::to_pgn_string_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen) {
+  std::string output;
+  diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+  auto result = diplomat::capi::Game_to_pgn_string_from_fen({data.data(), data.size()},
+    {initial_fen.data(), initial_fen.size()},
+    &write);
+  return result.is_ok ? diplomat::result<std::string, DecodeError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
 inline diplomat::result<std::string, DecodeError> Game::moved_pieces(diplomat::span<const uint8_t> data) {
   std::string output;
   diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
   auto result = diplomat::capi::Game_moved_pieces({data.data(), data.size()},
+    &write);
+  return result.is_ok ? diplomat::result<std::string, DecodeError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
+inline diplomat::result<std::string, DecodeError> Game::moved_pieces_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen) {
+  std::string output;
+  diplomat::capi::DiplomatWrite write = diplomat::WriteFromString(output);
+  auto result = diplomat::capi::Game_moved_pieces_from_fen({data.data(), data.size()},
+    {initial_fen.data(), initial_fen.size()},
     &write);
   return result.is_ok ? diplomat::result<std::string, DecodeError>(diplomat::Ok<std::string>(std::move(output))) : diplomat::result<std::string, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
@@ -127,6 +208,12 @@ inline std::unique_ptr<MoveDetailsIterator> Game::move_details_iterator() const 
 
 inline bool Game::is_valid_movedata(diplomat::span<const uint8_t> data) {
   auto result = diplomat::capi::Game_is_valid_movedata({data.data(), data.size()});
+  return result;
+}
+
+inline bool Game::is_valid_movedata_from_fen(diplomat::span<const uint8_t> data, std::string_view initial_fen) {
+  auto result = diplomat::capi::Game_is_valid_movedata_from_fen({data.data(), data.size()},
+    {initial_fen.data(), initial_fen.size()});
   return result;
 }
 

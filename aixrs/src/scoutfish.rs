@@ -3,7 +3,7 @@ use std::{io::Write, str::FromStr};
 use crate::ffi::{ScoutfishQueryParseError, Subfen};
 use aix_chess_compression::{Decode, Decoder, EncodedGame};
 use serde::Deserialize;
-use shakmaty::{san::San, Chess, Color, Move, Position};
+use shakmaty::{CastlingMode, Chess, Color, FromSetup, Move, Position, fen::Fen as ShakmatyFen, san::San};
 
 #[derive(Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
@@ -706,6 +706,19 @@ impl Streak {
 }
 
 impl Query {
+    fn initial_position(initial_fen: Option<&str>) -> Result<Chess, crate::ffi::DecodeError> {
+        let Some(initial_fen) = initial_fen else {
+            return Ok(Chess::new());
+        };
+
+        let parsed = ShakmatyFen::from_ascii(initial_fen.as_bytes())
+            .map_err(|_| crate::ffi::DecodeError::InvalidDataDuringDecoding)?;
+        let setup = parsed.as_setup();
+        let castling_mode = CastlingMode::detect(setup);
+        Chess::from_setup(setup.clone(), castling_mode)
+            .map_err(|_| crate::ffi::DecodeError::InvalidDataDuringDecoding)
+    }
+
     fn from_raw(raw: &RawQuery) -> Result<Query, ScoutfishQueryParseError> {
         match raw {
             RawQuery::Rule(r) => Ok(Query::Rule(Rule::frow_raw(r)?)),
@@ -752,8 +765,17 @@ impl Query {
         game: &EncodedGame,
         return_plies: bool,
     ) -> Result<(bool, Option<Vec<u16>>), crate::ffi::DecodeError> {
-        let decoder = Decoder::new(game);
-        let mut pos_opt = Some(Chess::new());
+        self.apply_with_initial_fen(game, return_plies, None)
+    }
+
+    pub fn apply_with_initial_fen(
+        &self,
+        game: &EncodedGame,
+        return_plies: bool,
+        initial_fen: Option<&str>,
+    ) -> Result<(bool, Option<Vec<u16>>), crate::ffi::DecodeError> {
+        let decoder = Decoder::new_with_initial_fen(game, initial_fen)?;
+        let mut pos_opt = Some(Self::initial_position(initial_fen)?);
 
         let mut sequence_state = if let Query::Sequence(_) = self {
             Some(SequenceState {
