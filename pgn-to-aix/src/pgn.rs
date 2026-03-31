@@ -80,6 +80,16 @@ pub struct GameInProcessing<'a> {
     clocks_black: Vec<(u16, u16)>,
     pos: Chess,
     ply: u16,
+    /// Stack of (saved_position, saved_ply) for variation support.
+    /// When entering a variation, we push the current position onto the stack
+    /// and restore the position to before the last mainline move.
+    position_stack: Vec<(Chess, u16)>,
+    /// The position before the last move was played, needed to branch variations.
+    pos_before_last_move: Option<Chess>,
+    /// The ply before the last move, for restoring ply in variations.
+    ply_before_last_move: u16,
+    /// Whether this encoder supports variations (only Low compression).
+    supports_variations: bool,
 }
 
 impl GameInProcessing<'_> {
@@ -97,8 +107,12 @@ impl GameInProcessing<'_> {
             evals: vec![],
             clocks_white: vec![],
             clocks_black: vec![],
-            pos,
+            pos: pos.clone(),
             ply: 0,
+            position_stack: vec![],
+            pos_before_last_move: None,
+            ply_before_last_move: 0,
+            supports_variations: level == CompressionLevel::Low,
         }
     }
 
@@ -180,6 +194,8 @@ impl<'a> Visitor for PgnProcessor<'a> {
             .to_move(&movetext.pos)
         {
             Ok(m) => {
+                movetext.pos_before_last_move = Some(movetext.pos.clone());
+                movetext.ply_before_last_move = movetext.ply;
                 movetext.pos.play_unchecked(m);
                 movetext.encoder.encode_move(m).unwrap();
                 movetext.ply += 1;
@@ -216,9 +232,41 @@ impl<'a> Visitor for PgnProcessor<'a> {
 
     fn begin_variation(
         &mut self,
-        _movetext: &mut Self::Movetext,
+        movetext: &mut Self::Movetext,
     ) -> ControlFlow<Self::Output, Skip> {
-        ControlFlow::Continue(Skip(true)) // stay in the mainline
+        if !movetext.supports_variations {
+            return ControlFlow::Continue(Skip(true)); // skip for non-Low compression
+        }
+
+        // Save current state and encode the variation start sentinel.
+        movetext.encoder.encode_start_variation();
+
+        // Push current position and ply so we can restore after the variation.
+        movetext.position_stack.push((movetext.pos.clone(), movetext.ply));
+
+        // Restore position to before the last move (the variation branches from there).
+        if let Some(ref saved_pos) = movetext.pos_before_last_move {
+            movetext.pos = saved_pos.clone();
+            movetext.ply = movetext.ply_before_last_move;
+        }
+
+        ControlFlow::Continue(Skip(false)) // process the variation
+    }
+
+    fn end_variation(
+        &mut self,
+        movetext: &mut Self::Movetext,
+    ) -> ControlFlow<Self::Output> {
+        // Encode the variation end sentinel.
+        movetext.encoder.encode_end_variation();
+
+        // Restore the position and ply from before this variation.
+        if let Some((saved_pos, saved_ply)) = movetext.position_stack.pop() {
+            movetext.pos = saved_pos;
+            movetext.ply = saved_ply;
+        }
+
+        ControlFlow::Continue(())
     }
 
     fn end_game(&mut self, movetext: Self::Movetext) -> Self::Output {

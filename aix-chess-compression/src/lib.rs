@@ -1,6 +1,6 @@
 use chess_huffman::EncodedGame as BitsEncodedGame;
 use shakmaty::{
-    CastlingMode, Chess, FromSetup, Move,
+    CastlingMode, Chess, FromSetup, Move, Position,
     fen::Fen as ShakmatyFen,
     san::{San, SanPlus, Suffix},
     uci::UciMove,
@@ -44,6 +44,17 @@ const LEVELS: [CompressionLevel; 3] = [
     CompressionLevel::Medium,
     CompressionLevel::High,
 ];
+
+/// An event in a game stream, including variation markers.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GameEvent {
+    /// A chess move on the current line.
+    Move(Move),
+    /// Start of a sub-variation (branch from current position before the preceding move).
+    StartVariation,
+    /// End of the current sub-variation (return to parent line).
+    EndVariation,
+}
 
 /// Encoder for chess games with different compression levels.
 pub enum Encoder<'a> {
@@ -213,6 +224,24 @@ impl Encoder<'_> {
             CompressionLevel::High => Ok(Encoder::Huffman(HuffEncoder::new())),
         }
     }
+
+    /// Encodes a start-variation sentinel. Only supported for Low compression.
+    /// Panics if called on a non-Naive encoder.
+    pub fn encode_start_variation(&mut self) {
+        match self {
+            Encoder::Naive(enc) => enc.encode_start_variation(),
+            _ => panic!("encode_start_variation is only supported for Low compression"),
+        }
+    }
+
+    /// Encodes an end-variation sentinel. Only supported for Low compression.
+    /// Panics if called on a non-Naive encoder.
+    pub fn encode_end_variation(&mut self) {
+        match self {
+            Encoder::Naive(enc) => enc.encode_end_variation(),
+            _ => panic!("encode_end_variation is only supported for Low compression"),
+        }
+    }
 }
 
 impl Encode for Encoder<'_> {
@@ -297,7 +326,7 @@ impl<'a> Decoder<'a> {
         Ok(s)
     }
 
-    /// Decodes all moves and represents the game as a PGN string.
+    /// Decodes all moves and represents the game as a PGN string (mainline only).
     pub fn into_pgn_string(self) -> DecodeResult<String>
     where
         Self: Sized,
@@ -325,6 +354,120 @@ impl<'a> Decoder<'a> {
             san_plus.append_to_string(&mut s);
 
             pos = next_pos;
+        }
+
+        Ok(s)
+    }
+
+    /// Decodes all moves including sub-variations and represents the game as a PGN string.
+    /// For Low-compression games that may contain variations, this produces output
+    /// with nested `(...)` notation. For other compression levels, this is identical
+    /// to `into_pgn_string()` since they don't support variations.
+    pub fn into_pgn_string_with_variations(self) -> DecodeResult<String>
+    where
+        Self: Sized,
+    {
+        match self {
+            Decoder::Naive(decoder) => Self::naive_pgn_with_variations(decoder),
+            // Other decoders don't support variations, fall back to mainline PGN.
+            other => other.into_pgn_string(),
+        }
+    }
+
+    /// Internal: build PGN string from a NaiveDecoder using next_event(),
+    /// handling sub-variations with a position stack.
+    fn naive_pgn_with_variations(mut decoder: NaiveDecoder<'_>) -> DecodeResult<String> {
+        let mut s = String::new();
+        let initial_pos = decoder.initial_position().clone();
+
+        // Stack of saved state when entering a variation.
+        // When we enter a variation, we save the parent state so we can restore it on EndVariation.
+        struct Frame {
+            pos_before_branch_move: Chess,
+            ply: u32,
+        }
+
+        let mut stack: Vec<Frame> = vec![];
+        let mut pos = initial_pos;
+        let mut ply: u32 = 0; // 0-based: 0 = white's first move, 1 = black's first move, etc.
+        let mut first_in_line = true;
+        let mut needs_space = false;
+        // Track the position BEFORE the last move played in the current line,
+        // so that when StartVariation arrives we can branch from there.
+        let mut pos_before_last_move: Option<Chess> = None;
+
+        loop {
+            let event = match decoder.next_event() {
+                None => break,
+                Some(Ok(ev)) => ev,
+                Some(Err(e)) => return Err(e),
+            };
+
+            match event {
+                GameEvent::Move(m) => {
+                    if needs_space {
+                        s.push(' ');
+                    }
+
+                    // White move: always print move number.
+                    // Black move: print move number with "..." only if first in line.
+                    if ply % 2 == 0 {
+                        let move_number = ply / 2 + 1;
+                        s.push_str(&format!("{}. ", move_number));
+                    } else if first_in_line {
+                        let move_number = ply / 2 + 1;
+                        s.push_str(&format!("{}... ", move_number));
+                    }
+
+                    let san = San::from_move(&pos, m);
+                    pos_before_last_move = Some(pos.clone());
+                    pos.play_unchecked(m);
+                    let suffix = Suffix::from_position(&pos);
+                    let san_plus = SanPlus { san, suffix };
+                    san_plus.append_to_string(&mut s);
+
+                    ply += 1;
+                    first_in_line = false;
+                    needs_space = true;
+                }
+                GameEvent::StartVariation => {
+                    // Save current state. The variation branches from the position
+                    // before the last move on this line.
+                    let branch_pos = pos_before_last_move
+                        .clone()
+                        .expect("StartVariation before any move");
+                    let branch_ply = ply - 1; // the ply the variation starts at
+
+                    stack.push(Frame {
+                        pos_before_branch_move: pos.clone(),
+                        ply,
+                    });
+
+                    // Start the variation
+                    if needs_space {
+                        s.push(' ');
+                    }
+                    s.push('(');
+                    needs_space = false;
+                    pos = branch_pos;
+                    decoder.set_position(pos.clone());
+                    ply = branch_ply;
+                    first_in_line = true;
+                }
+                GameEvent::EndVariation => {
+                    s.push(')');
+                    needs_space = true;
+
+                    let frame = stack.pop().expect("EndVariation without matching StartVariation");
+                    pos = frame.pos_before_branch_move;
+                    decoder.set_position(pos.clone());
+                    ply = frame.ply;
+                    // After a variation closes, the next move always needs a move number
+                    // indicator in PGN, regardless of what the parent state was.
+                    first_in_line = true;
+                    pos_before_last_move = None; // reset; next move will set it
+                }
+            }
         }
 
         Ok(s)
@@ -638,5 +781,113 @@ mod tests {
 
         let mut wrong_decoder = Decoder::new(&encoded);
         assert!(wrong_decoder.next_move().unwrap().is_err());
+    }
+
+    #[test]
+    fn pgn_with_simple_variation() {
+        // 1. e4 (1. d4) 1... e5
+        let pos = Chess::default();
+        let e4 = shakmaty::san::San::from_ascii(b"e4").unwrap().to_move(&pos).unwrap();
+        let d4 = shakmaty::san::San::from_ascii(b"d4").unwrap().to_move(&pos).unwrap();
+
+        let mut pos_after_e4 = pos.clone();
+        pos_after_e4.play_unchecked(e4);
+        let e5 = shakmaty::san::San::from_ascii(b"e5").unwrap().to_move(&pos_after_e4).unwrap();
+
+        let mut encoder = Encoder::new(CompressionLevel::Low);
+        encoder.encode_move(e4).unwrap();
+        encoder.encode_start_variation();
+        encoder.encode_move(d4).unwrap();
+        encoder.encode_end_variation();
+        encoder.encode_move(e5).unwrap();
+        let encoded = encoder.finish();
+
+        let bytes = encoded.into_bytes();
+        let restored = EncodedGame::from_bytes(&bytes).unwrap();
+
+        // Mainline PGN should not include variations
+        let decoder_mainline = Decoder::new(&restored);
+        let mainline_pgn = decoder_mainline.into_pgn_string().unwrap();
+        assert_eq!(mainline_pgn, "1. e4 e5");
+
+        // Full PGN should include variations
+        let decoder_full = Decoder::new(&restored);
+        let full_pgn = decoder_full.into_pgn_string_with_variations().unwrap();
+        assert_eq!(full_pgn, "1. e4 (1. d4) 1... e5");
+    }
+
+    #[test]
+    fn pgn_with_nested_variation() {
+        // 1. e4 (1. d4 (1. c4)) 1... e5 2. Nf3
+        let pos = Chess::default();
+        let e4 = shakmaty::san::San::from_ascii(b"e4").unwrap().to_move(&pos).unwrap();
+        let d4 = shakmaty::san::San::from_ascii(b"d4").unwrap().to_move(&pos).unwrap();
+        let c4 = shakmaty::san::San::from_ascii(b"c4").unwrap().to_move(&pos).unwrap();
+
+        let mut pos_after_e4 = pos.clone();
+        pos_after_e4.play_unchecked(e4);
+        let e5 = shakmaty::san::San::from_ascii(b"e5").unwrap().to_move(&pos_after_e4).unwrap();
+
+        let mut pos_after_e4_e5 = pos_after_e4.clone();
+        pos_after_e4_e5.play_unchecked(e5);
+        let nf3 = shakmaty::san::San::from_ascii(b"Nf3").unwrap().to_move(&pos_after_e4_e5).unwrap();
+
+        let mut encoder = Encoder::new(CompressionLevel::Low);
+        encoder.encode_move(e4).unwrap();
+        encoder.encode_start_variation();
+        encoder.encode_move(d4).unwrap();
+        encoder.encode_start_variation();
+        encoder.encode_move(c4).unwrap();
+        encoder.encode_end_variation();
+        encoder.encode_end_variation();
+        encoder.encode_move(e5).unwrap();
+        encoder.encode_move(nf3).unwrap();
+        let encoded = encoder.finish();
+
+        let bytes = encoded.into_bytes();
+        let restored = EncodedGame::from_bytes(&bytes).unwrap();
+
+        // Mainline: 1. e4 e5 2. Nf3
+        let decoder_mainline = Decoder::new(&restored);
+        let mainline_pgn = decoder_mainline.into_pgn_string().unwrap();
+        assert_eq!(mainline_pgn, "1. e4 e5 2. Nf3");
+
+        // Full PGN
+        let decoder_full = Decoder::new(&restored);
+        let full_pgn = decoder_full.into_pgn_string_with_variations().unwrap();
+        assert_eq!(full_pgn, "1. e4 (1. d4 (1. c4)) 1... e5 2. Nf3");
+    }
+
+    #[test]
+    fn pgn_variation_on_black_move() {
+        // 1. e4 e5 (1... d5) 2. Nf3
+        let pos = Chess::default();
+        let e4 = shakmaty::san::San::from_ascii(b"e4").unwrap().to_move(&pos).unwrap();
+
+        let mut pos_after_e4 = pos.clone();
+        pos_after_e4.play_unchecked(e4);
+        let e5 = shakmaty::san::San::from_ascii(b"e5").unwrap().to_move(&pos_after_e4).unwrap();
+        let d5 = shakmaty::san::San::from_ascii(b"d5").unwrap().to_move(&pos_after_e4).unwrap();
+
+        let mut pos_after_e4_e5 = pos_after_e4.clone();
+        pos_after_e4_e5.play_unchecked(e5);
+        let nf3 = shakmaty::san::San::from_ascii(b"Nf3").unwrap().to_move(&pos_after_e4_e5).unwrap();
+
+        let mut encoder = Encoder::new(CompressionLevel::Low);
+        encoder.encode_move(e4).unwrap();
+        encoder.encode_move(e5).unwrap();
+        encoder.encode_start_variation();
+        encoder.encode_move(d5).unwrap();
+        encoder.encode_end_variation();
+        encoder.encode_move(nf3).unwrap();
+        let encoded = encoder.finish();
+
+        let bytes = encoded.into_bytes();
+        let restored = EncodedGame::from_bytes(&bytes).unwrap();
+
+        // Full PGN
+        let decoder_full = Decoder::new(&restored);
+        let full_pgn = decoder_full.into_pgn_string_with_variations().unwrap();
+        assert_eq!(full_pgn, "1. e4 e5 (1... d5) 2. Nf3");
     }
 }

@@ -174,7 +174,7 @@ pub fn to_pgn_string_with_fen(
 ) -> Result<(), crate::ffi::DecodeError> {
     let encoded = EncodedGame::from_bytes(data)?;
     let decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
-    let pgn_string = decoder.into_pgn_string()?;
+    let pgn_string = decoder.into_pgn_string_with_variations()?;
     write!(out, "{pgn_string}").unwrap();
     Ok(())
 }
