@@ -1,5 +1,5 @@
 use crate::ffi::{Fen, Subfen};
-use aix_chess_compression::{Decode, Decoder, EncodedGame};
+use aix_chess_compression::{CompressionLevel, Decode, Decoder, EncodedGame};
 use shakmaty::{
     fen::{Fen as ShakmatyFen, ParseFenError},
     Board, CastlingMode, Chess, Color, FromSetup, Position,
@@ -87,6 +87,11 @@ pub fn matches_fen_with_initial_fen(
     let decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
     let target_pawn_home = get_pawn_home_for_fen(&fen);
 
+    let initial_position = initial_position_for_matching(&encoded, initial_fen)?;
+    if matches_fen_state(&fen, &initial_position) {
+        return Ok(true);
+    }
+
     for position in decoder.into_iter_positions() {
         let position = position?;
         let board = position.board();
@@ -100,6 +105,26 @@ pub fn matches_fen_with_initial_fen(
     }
 
     Ok(false)
+}
+
+fn initial_position_for_matching(
+    encoded: &EncodedGame,
+    initial_fen: Option<&str>,
+) -> Result<Chess, crate::ffi::DecodeError> {
+    if encoded.compression_level() != CompressionLevel::Low {
+        return Ok(Chess::new());
+    }
+
+    let Some(initial_fen) = initial_fen else {
+        return Ok(Chess::new());
+    };
+
+    let parsed = ShakmatyFen::from_ascii(initial_fen.as_bytes())
+        .map_err(|_| crate::ffi::DecodeError::InvalidDataDuringDecoding)?;
+    let setup = parsed.as_setup();
+    let castling_mode = CastlingMode::detect(setup);
+    Chess::from_setup(setup.clone(), castling_mode)
+        .map_err(|_| crate::ffi::DecodeError::InvalidDataDuringDecoding)
 }
 
 fn get_pawn_home(board: &Board) -> u16 {

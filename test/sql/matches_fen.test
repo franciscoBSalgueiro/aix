@@ -7,6 +7,24 @@ require aixchess
 
 
 query I
+SELECT matches_fen('\x9F-\x84\x1C\x1A\x9D:\xBD\xB3\xB8'::BLOB, 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -');
+----
+true
+
+
+query I
+SELECT matches_fen('\x0C\x1C4$\x05\x1A9*\x06\x151)\x04\x07>-\x0A\x12=\x22\x9A5\xBC5\x15&5>\x03\x11-#\x91#>=#5\x00'::BLOB, 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -');
+----
+true
+
+
+query I
+SELECT matches_fen('<]\x93.\x0DT?\xE2\xEC\xDE\xEFaFR\x973\xDB\x03v'::BLOB, 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -');
+----
+true
+
+
+query I
 SELECT matches_fen('\x9F-\x84\x1C\x1A\x9D:\xBD\xB3\xB8'::BLOB, 'r1bqkbnr/p1pp1ppp/1pn5/4p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 b kq -');
 ----
 true
