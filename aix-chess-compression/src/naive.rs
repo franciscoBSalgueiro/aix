@@ -4,7 +4,7 @@ use crate::{
     CompressionLevel, Decode, DecodeError, DecodeResult, Encode, EncodeError, EncodedGame,
     EncodedGameContent, GameEvent,
 };
-use shakmaty::{Chess, Move, Position, Square, uci::UciMove};
+use shakmaty::{Chess, Move, Position, Square, uci::{IllegalUciMoveError, UciMove}};
 
 /// Sentinel byte pair: start of a sub-variation.
 const SENTINEL_START_VARIATION: [u8; 2] = [0xFF, 0xFF];
@@ -98,8 +98,66 @@ pub struct NaiveDecoder<'a> {
     chess: Chess,
 }
 
+fn uci_to_move(uci: UciMove, pos: &Chess) -> Result<Move, IllegalUciMoveError> {
+    let candidate = match uci {
+        UciMove::Normal {
+            from,
+            to,
+            promotion,
+        } => {
+            let role = pos.board().role_at(from).ok_or(IllegalUciMoveError)?;
+
+            if promotion.is_some() && role != shakmaty::Role::Pawn {
+                return Err(IllegalUciMoveError);
+            }
+
+            if role == shakmaty::Role::King && (pos.castles().castling_rights() & pos.us()).contains(to) {
+                Move::Castle {
+                    king: from,
+                    rook: to,
+                }
+            } else if role == shakmaty::Role::King
+                && from == pos.turn().fold_wb(shakmaty::Square::E1, shakmaty::Square::E8)
+                && to.rank() == pos.turn().fold_wb(shakmaty::Rank::First, shakmaty::Rank::Eighth)
+                && from.distance(to) == 2
+            {
+                if from.file() < to.file() {
+                    Move::Castle {
+                        king: from,
+                        rook: pos.turn().fold_wb(shakmaty::Square::H1, shakmaty::Square::H8),
+                    }
+                } else {
+                    Move::Castle {
+                        king: from,
+                        rook: pos.turn().fold_wb(shakmaty::Square::A1, shakmaty::Square::A8),
+                    }
+                }
+            } else if role == shakmaty::Role::Pawn
+                && from.file() != to.file()
+                && !pos.board().occupied().contains(to)
+            {
+                Move::EnPassant { from, to }
+            } else {
+                Move::Normal {
+                    role,
+                    from,
+                    capture: pos.board().role_at(to),
+                    to,
+                    promotion,
+                }
+            }
+        }
+        UciMove::Put { role, to } => Move::Put { role, to },
+        UciMove::Null => return Err(IllegalUciMoveError)
+    };
+    Ok(candidate)
+}
+
 impl<'a> NaiveDecoder<'a> {
-    pub(crate) fn new(encoded: &'a EncodedGameContent<'a>, initial_position: Option<Chess>) -> Self {
+    pub(crate) fn new(
+        encoded: &'a EncodedGameContent<'a>,
+        initial_position: Option<Chess>,
+    ) -> Self {
         let initial_position = initial_position.unwrap_or_else(Chess::new);
         if let EncodedGameContent::Bytes(enc) = encoded {
             Self {
@@ -192,7 +250,8 @@ impl<'a> NaiveDecoder<'a> {
             to,
             promotion,
         };
-        let r = uci.to_move(&self.chess).map_err(|_| DecodeError {});
+        // let r = uci.to_move(&self.chess).map_err(|_| DecodeError {});
+        let r = uci_to_move(uci, &self.chess).map_err(|_| DecodeError {});
         Some(r.map(|m| {
             self.chess.play_unchecked(m); // uci.to_move already checks legality
             self.index += 2;
@@ -222,9 +281,7 @@ impl<'a> NaiveDecoder<'a> {
                 Some(Ok(GameEvent::EndVariation))
             }
             Some(SentinelKind::Unknown) => Some(Err(DecodeError {})),
-            None => self
-                .decode_raw_move()
-                .map(|r| r.map(GameEvent::Move)),
+            None => self.decode_raw_move().map(|r| r.map(GameEvent::Move)),
         }
     }
 
