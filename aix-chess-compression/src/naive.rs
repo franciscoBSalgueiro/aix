@@ -28,7 +28,7 @@ impl NaiveEncoder {
     pub fn new(initial_position: Option<Chess>) -> Self {
         Self {
             result: Vec::with_capacity(40),
-            _initial_position: initial_position.unwrap_or_else(Chess::new),
+            _initial_position: initial_position.unwrap_or_default(),
         }
     }
 
@@ -158,7 +158,7 @@ impl<'a> NaiveDecoder<'a> {
         encoded: &'a EncodedGameContent<'a>,
         initial_position: Option<Chess>,
     ) -> Self {
-        let initial_position = initial_position.unwrap_or_else(Chess::new);
+        let initial_position = initial_position.unwrap_or_default();
         if let EncodedGameContent::Bytes(enc) = encoded {
             Self {
                 encoded: enc,
@@ -252,10 +252,9 @@ impl<'a> NaiveDecoder<'a> {
         };
         // let r = uci.to_move(&self.chess).map_err(|_| DecodeError {});
         let r = uci_to_move(uci, &self.chess).map_err(|_| DecodeError {});
-        Some(r.map(|m| {
-            self.chess.play_unchecked(m); // uci.to_move already checks legality
+        Some(r.inspect(|m| {
+            self.chess.play_unchecked(*m); // uci.to_move already checks legality
             self.index += 2;
-            m
         }))
     }
 
