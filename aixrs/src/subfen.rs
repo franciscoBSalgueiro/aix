@@ -84,13 +84,13 @@ pub fn matches_fen_with_initial_fen(
     initial_fen: Option<&str>,
 ) -> Result<bool, crate::ffi::DecodeError> {
     let encoded = EncodedGame::from_bytes(game)?;
-    let mut decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
-    let target_pawn_home = get_pawn_home_for_fen(&fen);
-
     let initial_position = initial_position_for_matching(&encoded, initial_fen)?;
     if matches_fen_state(&fen, &initial_position) {
         return Ok(true);
     }
+
+    let mut decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
+    let target_pawn_home = get_pawn_home_for_fen(&fen);
 
     loop {
         let position = decoder.next_position();
