@@ -328,12 +328,24 @@ mod ffi {
             crate::subfen::matches_fen(self, game)
         }
 
+        pub fn matches_fen_ply(self, game: &[u8]) -> Result<u16, DecodeError> {
+            crate::subfen::matches_fen_ply(self, game)
+        }
+
         pub fn matches_fen_from_fen(
             self,
             game: &[u8],
             initial_fen: &str,
         ) -> Result<bool, DecodeError> {
             crate::subfen::matches_fen_with_initial_fen(self, game, Some(initial_fen))
+        }
+
+        pub fn matches_fen_ply_from_fen(
+            self,
+            game: &[u8],
+            initial_fen: &str,
+        ) -> Result<u16, DecodeError> {
+            crate::subfen::matches_fen_ply_with_initial_fen(self, game, Some(initial_fen))
         }
     }
 

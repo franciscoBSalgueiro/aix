@@ -78,6 +78,10 @@ pub fn matches_fen(fen: Fen, game: &[u8]) -> Result<bool, crate::ffi::DecodeErro
     matches_fen_with_initial_fen(fen, game, None)
 }
 
+pub fn matches_fen_ply(fen: Fen, game: &[u8]) -> Result<u16, crate::ffi::DecodeError> {
+    matches_fen_ply_with_initial_fen(fen, game, None)
+}
+
 pub fn matches_fen_with_initial_fen(
     fen: Fen,
     game: &[u8],
@@ -111,6 +115,42 @@ pub fn matches_fen_with_initial_fen(
     }
 
     Ok(false)
+}
+
+pub fn matches_fen_ply_with_initial_fen(
+    fen: Fen,
+    game: &[u8],
+    initial_fen: Option<&str>,
+) -> Result<u16, crate::ffi::DecodeError> {
+    let encoded = EncodedGame::from_bytes(game)?;
+    let initial_position = initial_position_for_matching(&encoded, initial_fen)?;
+    if matches_fen_state(&fen, &initial_position) {
+        return Ok(0);
+    }
+
+    let mut decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
+    let target_pawn_home = get_pawn_home_for_fen(&fen);
+    let mut ply: u16 = 0;
+
+    loop {
+        let position = decoder.next_position();
+        if let Some(position) = position {
+            ply = ply.saturating_add(1);
+            let position = position?;
+            let board = position.board();
+            if !is_end_reachable(target_pawn_home, get_pawn_home(board)) {
+                return Err(crate::ffi::DecodeError::NoErrorNoValue);
+            }
+
+            if matches_fen_state(&fen, position) {
+                return Ok(ply);
+            }
+        } else {
+            break;
+        }
+    }
+
+    Err(crate::ffi::DecodeError::NoErrorNoValue)
 }
 
 fn initial_position_for_matching(

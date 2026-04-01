@@ -69,6 +69,33 @@ inline void MatchesFen(DataChunk &args, ExpressionState &state, Vector &result) 
 	});
 }
 
+inline void MatchesFenPly(DataChunk &args, ExpressionState &state, Vector &result) {
+	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
+	auto &info = func_expr.bind_info->Cast<MatchesFenBindData>();
+
+	if (info.is_null) {
+		result.SetVectorType(VectorType::CONSTANT_VECTOR);
+		ConstantVector::SetNull(result, true);
+		return;
+	}
+
+	auto fen = info.fen;
+
+	UnaryExecutor::ExecuteWithNulls<string_t, uint16_t>(args.data[0], result, args.size(),
+	                                                   [&](string_t game, ValidityMask &mask, idx_t idx) {
+		                                                   diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+		                                                   auto ply_result = fen.matches_fen_ply(data);
+		                                                   auto ply_opt = UnwrapOptionalDecoded<uint16_t>(std::move(ply_result), "matches_fen_ply");
+
+		                                                   if (!ply_opt.has_value()) {
+			                                                   mask.SetInvalid(idx);
+			                                                   return uint16_t(0);
+		                                                   }
+
+		                                                   return *ply_opt;
+	                                                   });
+}
+
 inline void MatchesFenFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
 	auto &info = func_expr.bind_info->Cast<MatchesFenBindData>();
@@ -92,6 +119,35 @@ inline void MatchesFenFromFen(DataChunk &args, ExpressionState &state, Vector &r
 	                                                 });
 }
 
+inline void MatchesFenPlyFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
+	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
+	auto &info = func_expr.bind_info->Cast<MatchesFenBindData>();
+
+	if (info.is_null) {
+		result.SetVectorType(VectorType::CONSTANT_VECTOR);
+		ConstantVector::SetNull(result, true);
+		return;
+	}
+
+	auto fen = info.fen;
+
+	BinaryExecutor::ExecuteWithNulls<string_t, string_t, uint16_t>(
+	    args.data[0], args.data[2], result, args.size(),
+	    [&](string_t game, string_t initial_fen, ValidityMask &mask, idx_t idx) {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+		    auto ply_result = fen.matches_fen_ply_from_fen(
+		        data, std::string_view(initial_fen.GetData(), initial_fen.GetSize()));
+		    auto ply_opt = UnwrapOptionalDecoded<uint16_t>(std::move(ply_result), "matches_fen_ply");
+
+		    if (!ply_opt.has_value()) {
+			    mask.SetInvalid(idx);
+			    return uint16_t(0);
+		    }
+
+		    return *ply_opt;
+	    });
+}
+
 } // namespace
 
 void Register_MatchesFen(ExtensionLoader &loader) {
@@ -103,6 +159,16 @@ void Register_MatchesFen(ExtensionLoader &loader) {
 	    ScalarFunction("matches_fen", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
 	                   LogicalType::BOOLEAN, MatchesFenFromFen, MatchesFenBindFunction);
 	loader.RegisterFunction(matches_fen_from_fen_function);
+
+	auto matches_fen_ply_function = ScalarFunction("matches_fen_ply", {LogicalType::BLOB, LogicalType::VARCHAR},
+	                                               LogicalType::USMALLINT, MatchesFenPly,
+	                                               MatchesFenBindFunction);
+	loader.RegisterFunction(matches_fen_ply_function);
+
+	auto matches_fen_ply_from_fen_function =
+	    ScalarFunction("matches_fen_ply", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
+	                   LogicalType::USMALLINT, MatchesFenPlyFromFen, MatchesFenBindFunction);
+	loader.RegisterFunction(matches_fen_ply_from_fen_function);
 }
 
 } // namespace duckdb

@@ -89,6 +89,19 @@ Unlike `matches_subfen`, this requires an exact board match.
 When `initial_fen` is provided, matching decodes from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
 
 
+## matches_fen_ply
+
+`matches_fen_ply(movedata BLOB, fen VARCHAR) -> USMALLINT`
+
+`matches_fen_ply(movedata BLOB, fen VARCHAR, initial_fen VARCHAR) -> USMALLINT`
+
+Returns the first ply where a position exactly matches the given FEN.
+Returns `NULL` when no position matches.
+As with `matches_fen`, move counters in the FEN are ignored.
+
+When `initial_fen` is provided, matching decodes from that position for LOW-compressed movedata. Medium and High compression ignore `initial_fen`.
+
+
 ## move_details(_ext)
 
 `move_details(BLOB) -> STRUCT(ply USMALLINT, "role" VARCHAR, "from" VARCHAR, "to" VARCHAR, promotion VARCHAR, capture VARCHAR, is_castle BOOLEAN, is_en_passant BOOLEAN, is_check BOOLEAN, is_checkmate BOOLEAN)[]`
