@@ -84,7 +84,7 @@ pub fn matches_fen_with_initial_fen(
     initial_fen: Option<&str>,
 ) -> Result<bool, crate::ffi::DecodeError> {
     let encoded = EncodedGame::from_bytes(game)?;
-    let decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
+    let mut decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
     let target_pawn_home = get_pawn_home_for_fen(&fen);
 
     let initial_position = initial_position_for_matching(&encoded, initial_fen)?;
@@ -92,15 +92,21 @@ pub fn matches_fen_with_initial_fen(
         return Ok(true);
     }
 
-    for position in decoder.into_iter_positions() {
-        let position = position?;
-        let board = position.board();
-        if !is_end_reachable(target_pawn_home, get_pawn_home(board)) {
-            return Ok(false);
-        }
+    loop {
+        let position = decoder.next_position();
+        if let Some(position) = position {
+            let position = position?;
+            let board = position.board();
+            if !is_end_reachable(target_pawn_home, get_pawn_home(board)) {
+                return Ok(false);
+            }
+        
+            if matches_fen_state(&fen, position) {
+                return Ok(true);
+            }
 
-        if matches_fen_state(&fen, &position) {
-            return Ok(true);
+        } else {
+            break;
         }
     }
 
