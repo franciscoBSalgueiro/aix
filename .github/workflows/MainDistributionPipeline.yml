@@ -26,18 +26,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+          
       - name: Determine commit tag
         id: get_tag
         run: |
-          # Try to get the exact tag of the current commit.
-          # If the commit isn't tagged, it falls back to "dev-" plus the short commit SHA.
           TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "dev-${GITHUB_SHA::7}")
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           
@@ -45,14 +43,24 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: aixchess-*
-          path: release-artifacts
-          merge-multiple: true
+          path: downloaded-artifacts
+          
+      - name: Rename and stage files for release
+        run: |
+          mkdir release-stage
+          
+          for dir in downloaded-artifacts/*; do
+            if [ -d "$dir" ]; then
+              folder_name=$(basename "$dir")              
+              mv "$dir/aixchess.duckdb_extension" "release-stage/${folder_name}.duckdb_extension"
+            fi
+          done
           
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_tag.outputs.tag }}
           name: Release ${{ steps.get_tag.outputs.tag }}
-          files: release-artifacts/* # Attaches all the binaries downloaded in the previous step
+          files: release-stage/*
           draft: false
           prerelease: false
