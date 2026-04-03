@@ -43,6 +43,7 @@ fn main() {
         app,
         CompressionLevel::Low,
         args.continue_on_invalid_move,
+        args.min_timestamp
     );
 
     let file = File::open(input_path).unwrap();

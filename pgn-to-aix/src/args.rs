@@ -15,6 +15,10 @@ pub(super) struct Args {
     #[arg(long)]
     pub duckdb_memory_limit_gb: Option<u16>,
 
+    /// Optional minimal timestamp for games to be converted
+    #[arg(long)]
+    pub min_timestamp: Option<i32>,
+
     /// Set this flag to continue processing even if an invalid move is encountered in a game, rather than exiting with an error. The game with the invalid move will end right before the invalid move.
     #[arg(long, default_value_t = false, action = clap::ArgAction::SetTrue)]
     pub continue_on_invalid_move: bool,
