@@ -2,6 +2,8 @@
 
 The Aix extension provides several scalar functions in DuckDB that can be applied to encoded games, move times, or engine evaluations.
 
+For any function overload that accepts `initial_fen`, passing `NULL` is equivalent to calling the overload without `initial_fen`.
+
 ## board_at_position
 
 `board_at_position(movedata BLOB, position INTEGER) -> STRUCT(a1 VARCHAR, b1 VARCHAR, c1 VARCHAR, ..., h8 VARCHAR)`

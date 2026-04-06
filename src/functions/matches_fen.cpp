@@ -108,15 +108,33 @@ inline void MatchesFenFromFen(DataChunk &args, ExpressionState &state, Vector &r
 
 	auto fen = info.fen;
 
-	BinaryExecutor::Execute<string_t, string_t, bool>(args.data[0], args.data[2], result, args.size(),
-	                                                 [&](string_t game, string_t initial_fen) {
-		                                                 diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
-		                                                 return UnwrapDecoded<bool>(
-		                                                     fen.matches_fen_from_fen(
-		                                                         data,
-		                                                         std::string_view(initial_fen.GetData(), initial_fen.GetSize())),
-		                                                     "matches_fen");
-	                                                 });
+	auto count = args.size();
+	result.SetVectorType(VectorType::FLAT_VECTOR);
+	auto &validity = FlatVector::Validity(result);
+
+	UnifiedReader<string_t> game_reader;
+	UnifiedReader<string_t> fen_reader;
+	game_reader.Init(args.data[0], count);
+	fen_reader.Init(args.data[2], count);
+
+	auto out = FlatVector::GetData<bool>(result);
+	for (idx_t i = 0; i < count; i++) {
+		if (game_reader.IsNull(i)) {
+			validity.SetInvalid(i);
+			continue;
+		}
+
+		auto game = game_reader.Get(i);
+		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+
+		out[i] = fen_reader.IsNull(i)
+		             ? UnwrapDecoded<bool>(fen.matches_fen(data), "matches_fen")
+		             : UnwrapDecoded<bool>(
+		                   fen.matches_fen_from_fen(
+		                       data,
+		                       std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize())),
+		                   "matches_fen");
+	}
 }
 
 inline void MatchesFenPlyFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -131,21 +149,39 @@ inline void MatchesFenPlyFromFen(DataChunk &args, ExpressionState &state, Vector
 
 	auto fen = info.fen;
 
-	BinaryExecutor::ExecuteWithNulls<string_t, string_t, uint16_t>(
-	    args.data[0], args.data[2], result, args.size(),
-	    [&](string_t game, string_t initial_fen, ValidityMask &mask, idx_t idx) {
-		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
-		    auto ply_result = fen.matches_fen_ply_from_fen(
-		        data, std::string_view(initial_fen.GetData(), initial_fen.GetSize()));
-		    auto ply_opt = UnwrapOptionalDecoded<uint16_t>(std::move(ply_result), "matches_fen_ply");
+	auto count = args.size();
+	result.SetVectorType(VectorType::FLAT_VECTOR);
+	auto &validity = FlatVector::Validity(result);
 
-		    if (!ply_opt.has_value()) {
-			    mask.SetInvalid(idx);
-			    return uint16_t(0);
-		    }
+	UnifiedReader<string_t> game_reader;
+	UnifiedReader<string_t> fen_reader;
+	game_reader.Init(args.data[0], count);
+	fen_reader.Init(args.data[2], count);
 
-		    return *ply_opt;
-	    });
+	auto out = FlatVector::GetData<uint16_t>(result);
+	for (idx_t i = 0; i < count; i++) {
+		if (game_reader.IsNull(i)) {
+			validity.SetInvalid(i);
+			continue;
+		}
+
+		auto game = game_reader.Get(i);
+		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+
+		auto ply_result = fen_reader.IsNull(i)
+		                    ? fen.matches_fen_ply(data)
+		                    : fen.matches_fen_ply_from_fen(
+		                          data,
+		                          std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize()));
+		auto ply_opt = UnwrapOptionalDecoded<uint16_t>(std::move(ply_result), "matches_fen_ply");
+
+		if (!ply_opt.has_value()) {
+			validity.SetInvalid(i);
+			continue;
+		}
+
+		out[i] = *ply_opt;
+	}
 }
 
 } // namespace

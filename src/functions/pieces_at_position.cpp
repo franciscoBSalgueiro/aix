@@ -109,41 +109,58 @@ inline void PiecesAtPosition(DataChunk &args, ExpressionState &state, Vector &re
 }
 
 inline void PiecesAtPositionFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
-	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int32_t>, PrimitiveType<string_t>,
-	                                PiecesAtPositionResult>(
-	    args.data[0], args.data[1], args.data[2], result, args.size(),
-	    [&](PrimitiveType<string_t> game, PrimitiveType<int32_t> pos, PrimitiveType<string_t> initial_fen) {
-		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
-		    auto bitboards_result = Game::pieces_at_position_from_fen(
-		        data, pos.val, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
-		    const auto bitboards_opt =
-		        UnwrapOptionalDecoded<Bitboards>(std::move(bitboards_result), "pieces_at_position");
+	auto count = args.size();
+	result.SetVectorType(VectorType::FLAT_VECTOR);
+	auto &validity = FlatVector::Validity(result);
 
-		    PiecesAtPositionResult res;
+	UnifiedReader<string_t> game_reader;
+	UnifiedReader<int32_t> pos_reader;
+	UnifiedReader<string_t> fen_reader;
+	game_reader.Init(args.data[0], count);
+	pos_reader.Init(args.data[1], count);
+	fen_reader.Init(args.data[2], count);
 
-		    if (!bitboards_opt.has_value()) {
-			    res.valid = false;
-			    return res;
-		    }
+	for (idx_t i = 0; i < count; i++) {
+		if (game_reader.IsNull(i) || pos_reader.IsNull(i)) {
+			validity.SetInvalid(i);
+			continue;
+		}
 
-		    res.valid = true;
+		auto game = game_reader.Get(i);
+		auto pos = pos_reader.Get(i);
+		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
 
-		    const Bitboards &bitboards = *bitboards_opt;
+		auto bitboards_result = fen_reader.IsNull(i)
+		                         ? Game::pieces_at_position(data, pos)
+		                         : Game::pieces_at_position_from_fen(
+		                               data,
+		                               pos,
+		                               std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize()));
+		const auto bitboards_opt =
+		    UnwrapOptionalDecoded<Bitboards>(std::move(bitboards_result), "pieces_at_position");
 
-		    res.wk_val = STR(BitboardToSquare(bitboards.w_k));
-		    BitboardToSquareList(bitboards.w_q, res.wq_val);
-		    BitboardToSquareList(bitboards.w_r, res.wr_val);
-		    BitboardToSquareList(bitboards.w_b, res.wb_val);
-		    BitboardToSquareList(bitboards.w_n, res.wn_val);
-		    BitboardToSquareList(bitboards.w_p, res.wp_val);
-		    res.bk_val = STR(BitboardToSquare(bitboards.b_k));
-		    BitboardToSquareList(bitboards.b_q, res.bq_val);
-		    BitboardToSquareList(bitboards.b_r, res.br_val);
-		    BitboardToSquareList(bitboards.b_b, res.bb_val);
-		    BitboardToSquareList(bitboards.b_n, res.bn_val);
-		    BitboardToSquareList(bitboards.b_p, res.bp_val);
-		    return res;
-	    });
+		if (!bitboards_opt.has_value()) {
+			validity.SetInvalid(i);
+			continue;
+		}
+
+		const Bitboards &bitboards = *bitboards_opt;
+		PiecesAtPositionResult res;
+		res.valid = true;
+		res.wk_val = STR(BitboardToSquare(bitboards.w_k));
+		BitboardToSquareList(bitboards.w_q, res.wq_val);
+		BitboardToSquareList(bitboards.w_r, res.wr_val);
+		BitboardToSquareList(bitboards.w_b, res.wb_val);
+		BitboardToSquareList(bitboards.w_n, res.wn_val);
+		BitboardToSquareList(bitboards.w_p, res.wp_val);
+		res.bk_val = STR(BitboardToSquare(bitboards.b_k));
+		BitboardToSquareList(bitboards.b_q, res.bq_val);
+		BitboardToSquareList(bitboards.b_r, res.br_val);
+		BitboardToSquareList(bitboards.b_b, res.bb_val);
+		BitboardToSquareList(bitboards.b_n, res.bn_val);
+		BitboardToSquareList(bitboards.b_p, res.bp_val);
+		PiecesAtPositionResult::AssignResult(result, i, res);
+	}
 }
 
 } // namespace

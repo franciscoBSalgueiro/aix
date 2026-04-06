@@ -82,26 +82,41 @@ inline void MoveDetailsExtFn(DataChunk &args, ExpressionState &state, Vector &re
 
 inline void MoveDetailsExtFromFenFn(DataChunk &args, ExpressionState &state, Vector &result) {
 	const char *func_name = "move_details_ext";
+	auto count = args.size();
+	result.SetVectorType(VectorType::FLAT_VECTOR);
+	auto &validity = FlatVector::Validity(result);
 
-	GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<string_t>,
-	                              GenericListType<MoveDetailsStruct<false, MoveDetailsExtended>>>(
-	    args.data[0], args.data[1], result, args.size(),
-	    [&](PrimitiveType<string_t> game, PrimitiveType<string_t> initial_fen) {
-		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+	UnifiedReader<string_t> game_reader;
+	UnifiedReader<string_t> fen_reader;
+	game_reader.Init(args.data[0], count);
+	fen_reader.Init(args.data[1], count);
 
-		    auto game_obj_result = Game::from_bytes_from_fen(
-		        data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
-		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
-		    auto iter = game_obj->move_details_ext_iterator();
-		    GenericListType<MoveDetailsStruct<false, MoveDetailsExtended>> moves;
-		    while (auto opt = UnwrapOptionalDecoded(iter->next(), func_name)) {
-			    MoveDetailsStruct<false, MoveDetailsExtended> move;
-			    move.inner = *opt;
-			    moves.values.push_back(move);
-		    }
+	for (idx_t i = 0; i < count; i++) {
+		if (game_reader.IsNull(i)) {
+			validity.SetInvalid(i);
+			continue;
+		}
 
-		    return moves;
-	    });
+		auto game = game_reader.Get(i);
+		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+
+		auto game_obj_result = fen_reader.IsNull(i)
+		                       ? Game::from_bytes(data)
+		                       : Game::from_bytes_from_fen(
+		                             data,
+		                             std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize()));
+		auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		auto iter = game_obj->move_details_ext_iterator();
+
+		GenericListType<MoveDetailsStruct<false, MoveDetailsExtended>> moves;
+		while (auto opt = UnwrapOptionalDecoded(iter->next(), func_name)) {
+			MoveDetailsStruct<false, MoveDetailsExtended> move;
+			move.inner = *opt;
+			moves.values.push_back(move);
+		}
+
+		GenericListType<MoveDetailsStruct<false, MoveDetailsExtended>>::AssignResult(result, i, moves);
+	}
 }
 
 inline void MoveDetailsFn(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -127,26 +142,41 @@ inline void MoveDetailsFn(DataChunk &args, ExpressionState &state, Vector &resul
 
 inline void MoveDetailsFromFenFn(DataChunk &args, ExpressionState &state, Vector &result) {
 	const char *func_name = "move_details";
+	auto count = args.size();
+	result.SetVectorType(VectorType::FLAT_VECTOR);
+	auto &validity = FlatVector::Validity(result);
 
-	GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<string_t>,
-	                              GenericListType<MoveDetailsStruct<false, MoveDetails>>>(
-	    args.data[0], args.data[1], result, args.size(),
-	    [&](PrimitiveType<string_t> game, PrimitiveType<string_t> initial_fen) {
-		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+	UnifiedReader<string_t> game_reader;
+	UnifiedReader<string_t> fen_reader;
+	game_reader.Init(args.data[0], count);
+	fen_reader.Init(args.data[1], count);
 
-		    auto game_obj_result = Game::from_bytes_from_fen(
-		        data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
-		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
-		    auto iter = game_obj->move_details_iterator();
-		    GenericListType<MoveDetailsStruct<false, MoveDetails>> moves;
-		    while (auto opt = UnwrapOptionalDecoded(iter->next(), func_name)) {
-			    MoveDetailsStruct<false, MoveDetails> move;
-			    move.inner = *opt;
-			    moves.values.push_back(move);
-		    }
+	for (idx_t i = 0; i < count; i++) {
+		if (game_reader.IsNull(i)) {
+			validity.SetInvalid(i);
+			continue;
+		}
 
-		    return moves;
-	    });
+		auto game = game_reader.Get(i);
+		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+
+		auto game_obj_result = fen_reader.IsNull(i)
+		                       ? Game::from_bytes(data)
+		                       : Game::from_bytes_from_fen(
+		                             data,
+		                             std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize()));
+		auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		auto iter = game_obj->move_details_iterator();
+
+		GenericListType<MoveDetailsStruct<false, MoveDetails>> moves;
+		while (auto opt = UnwrapOptionalDecoded(iter->next(), func_name)) {
+			MoveDetailsStruct<false, MoveDetails> move;
+			move.inner = *opt;
+			moves.values.push_back(move);
+		}
+
+		GenericListType<MoveDetailsStruct<false, MoveDetails>>::AssignResult(result, i, moves);
+	}
 }
 
 inline void MoveDetailsExtAtFn(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -175,28 +205,47 @@ inline void MoveDetailsExtAtFn(DataChunk &args, ExpressionState &state, Vector &
 
 inline void MoveDetailsExtAtFromFenFn(DataChunk &args, ExpressionState &state, Vector &result) {
 	const char *func_name = "move_details_ext_at";
+	auto count = args.size();
+	result.SetVectorType(VectorType::FLAT_VECTOR);
+	auto &validity = FlatVector::Validity(result);
 
-	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int16_t>, PrimitiveType<string_t>,
-	                               MoveDetailsStruct<true, MoveDetailsExtended>>(
-	    args.data[0], args.data[1], args.data[2], result, args.size(),
-	    [&](PrimitiveType<string_t> game, PrimitiveType<int16_t> ply, PrimitiveType<string_t> initial_fen) {
-		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+	UnifiedReader<string_t> game_reader;
+	UnifiedReader<int16_t> ply_reader;
+	UnifiedReader<string_t> fen_reader;
+	game_reader.Init(args.data[0], count);
+	ply_reader.Init(args.data[1], count);
+	fen_reader.Init(args.data[2], count);
 
-		    auto game_obj_result = Game::from_bytes_from_fen(
-		        data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
-		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
-		    auto iter = game_obj->move_details_ext_iterator();
-		    auto maybe_move_result = iter->nth(ply.val);
-		    auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), func_name);
+	for (idx_t i = 0; i < count; i++) {
+		if (game_reader.IsNull(i) || ply_reader.IsNull(i)) {
+			validity.SetInvalid(i);
+			continue;
+		}
 
-		    MoveDetailsStruct<true, MoveDetailsExtended> move;
-		    if (!maybe_move.has_value()) {
-			    move.valid = false;
-		    } else {
-			    move.inner = *maybe_move;
-		    }
-		    return move;
-	    });
+		auto game = game_reader.Get(i);
+		auto ply = ply_reader.Get(i);
+		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+
+		auto game_obj_result = fen_reader.IsNull(i)
+		                       ? Game::from_bytes(data)
+		                       : Game::from_bytes_from_fen(
+		                             data,
+		                             std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize()));
+		auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		auto iter = game_obj->move_details_ext_iterator();
+		auto maybe_move_result = iter->nth(ply);
+		auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), func_name);
+
+		if (!maybe_move.has_value()) {
+			validity.SetInvalid(i);
+			continue;
+		}
+
+		MoveDetailsStruct<true, MoveDetailsExtended> move;
+		move.valid = true;
+		move.inner = *maybe_move;
+		MoveDetailsStruct<true, MoveDetailsExtended>::AssignResult(result, i, move);
+	}
 }
 
 inline void MoveDetailsAtFn(DataChunk &args, ExpressionState &state, Vector &result) {
@@ -225,28 +274,47 @@ inline void MoveDetailsAtFn(DataChunk &args, ExpressionState &state, Vector &res
 
 inline void MoveDetailsAtFromFenFn(DataChunk &args, ExpressionState &state, Vector &result) {
 	const char *func_name = "move_details_at";
+	auto count = args.size();
+	result.SetVectorType(VectorType::FLAT_VECTOR);
+	auto &validity = FlatVector::Validity(result);
 
-	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int16_t>, PrimitiveType<string_t>,
-	                               MoveDetailsStruct<true, MoveDetails>>(
-	    args.data[0], args.data[1], args.data[2], result, args.size(),
-	    [&](PrimitiveType<string_t> game, PrimitiveType<int16_t> ply, PrimitiveType<string_t> initial_fen) {
-		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
+	UnifiedReader<string_t> game_reader;
+	UnifiedReader<int16_t> ply_reader;
+	UnifiedReader<string_t> fen_reader;
+	game_reader.Init(args.data[0], count);
+	ply_reader.Init(args.data[1], count);
+	fen_reader.Init(args.data[2], count);
 
-		    auto game_obj_result = Game::from_bytes_from_fen(
-		        data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()));
-		    auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
-		    auto iter = game_obj->move_details_iterator();
-		    auto maybe_move_result = iter->nth(ply.val);
-		    auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), func_name);
+	for (idx_t i = 0; i < count; i++) {
+		if (game_reader.IsNull(i) || ply_reader.IsNull(i)) {
+			validity.SetInvalid(i);
+			continue;
+		}
 
-		    MoveDetailsStruct<true, MoveDetails> move;
-		    if (!maybe_move.has_value()) {
-			    move.valid = false;
-		    } else {
-			    move.inner = *maybe_move;
-		    }
-		    return move;
-	    });
+		auto game = game_reader.Get(i);
+		auto ply = ply_reader.Get(i);
+		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+
+		auto game_obj_result = fen_reader.IsNull(i)
+		                       ? Game::from_bytes(data)
+		                       : Game::from_bytes_from_fen(
+		                             data,
+		                             std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize()));
+		auto game_obj = UnwrapDecoded(std::move(game_obj_result), func_name);
+		auto iter = game_obj->move_details_iterator();
+		auto maybe_move_result = iter->nth(ply);
+		auto maybe_move = UnwrapOptionalDecoded(std::move(maybe_move_result), func_name);
+
+		if (!maybe_move.has_value()) {
+			validity.SetInvalid(i);
+			continue;
+		}
+
+		MoveDetailsStruct<true, MoveDetails> move;
+		move.valid = true;
+		move.inner = *maybe_move;
+		MoveDetailsStruct<true, MoveDetails>::AssignResult(result, i, move);
+	}
 }
 
 } // namespace

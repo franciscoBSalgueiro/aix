@@ -69,4 +69,29 @@ std::optional<T> UnwrapOptionalDecoded(diplomat::result<T, DecodeError> &&result
 	}
 }
 
+inline bool IsConstantNull(Vector &vector) {
+	return vector.GetVectorType() == VectorType::CONSTANT_VECTOR && ConstantVector::IsNull(vector);
+}
+
+template <typename T>
+struct UnifiedReader {
+	UnifiedVectorFormat format;
+	const T *data = nullptr;
+
+	void Init(Vector &vector, idx_t count) {
+		vector.ToUnifiedFormat(count, format);
+		data = UnifiedVectorFormat::GetData<T>(format);
+	}
+
+	bool IsNull(idx_t row) const {
+		auto idx = format.sel->get_index(row);
+		return !format.validity.RowIsValid(idx);
+	}
+
+	T Get(idx_t row) const {
+		auto idx = format.sel->get_index(row);
+		return data[idx];
+	}
+};
+
 } // namespace duckdb

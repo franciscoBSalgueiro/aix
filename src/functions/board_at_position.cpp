@@ -51,19 +51,45 @@ inline void BoardAtPosition(DataChunk &args, ExpressionState &state, Vector &res
 }
 
 inline void BoardAtPositionFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
-	GenericExecutor::ExecuteTernary<PrimitiveType<string_t>, PrimitiveType<int32_t>, PrimitiveType<string_t>,
-	                                BoardStruct>(
-	    args.data[0], args.data[1], args.data[2], result, args.size(),
-	    [&](PrimitiveType<string_t> game, PrimitiveType<int32_t> pos, PrimitiveType<string_t> initial_fen) {
-		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
-		    BoardStruct b;
-		    auto board_span = diplomat::span<int8_t>(b.board, 64);
-		    auto res = Game::board_at_position_from_fen(
-		        data, pos.val, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()), board_span);
-		    auto opt = UnwrapOptionalDecoded<std::monostate>(std::move(res), "board_at_position");
-		    b.valid = opt.has_value();
-		    return b;
-	    });
+	auto count = args.size();
+	result.SetVectorType(VectorType::FLAT_VECTOR);
+	auto &validity = FlatVector::Validity(result);
+
+	UnifiedReader<string_t> game_reader;
+	UnifiedReader<int32_t> pos_reader;
+	UnifiedReader<string_t> fen_reader;
+	game_reader.Init(args.data[0], count);
+	pos_reader.Init(args.data[1], count);
+	fen_reader.Init(args.data[2], count);
+
+	for (idx_t i = 0; i < count; i++) {
+		if (game_reader.IsNull(i) || pos_reader.IsNull(i)) {
+			validity.SetInvalid(i);
+			continue;
+		}
+
+		auto game = game_reader.Get(i);
+		auto pos = pos_reader.Get(i);
+		diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+		BoardStruct b;
+		auto board_span = diplomat::span<int8_t>(b.board, 64);
+
+		auto decode_result = fen_reader.IsNull(i)
+		                       ? Game::board_at_position(data, pos, board_span)
+		                       : Game::board_at_position_from_fen(
+		                             data,
+		                             pos,
+		                             std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize()),
+		                             board_span);
+		auto opt = UnwrapOptionalDecoded<std::monostate>(std::move(decode_result), "board_at_position");
+		if (!opt.has_value()) {
+			validity.SetInvalid(i);
+			continue;
+		}
+
+		b.valid = true;
+		BoardStruct::AssignResult(result, i, b);
+	}
 }
 
 } // namespace

@@ -105,13 +105,31 @@ inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &resu
 			return UnwrapDecoded(query->matches(data), "scoutfish_query");
 		});
 	} else if constexpr (!PLIES && FROM_FEN) {
-		BinaryExecutor::Execute<string_t, string_t, bool>(
-		    args.data[0], args.data[2], result, count, [&](string_t game, string_t initial_fen) {
-			    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
-			    return UnwrapDecoded(
-			        query->matches_from_fen(data, std::string_view(initial_fen.GetData(), initial_fen.GetSize())),
-			        "scoutfish_query");
-		    });
+		result.SetVectorType(VectorType::FLAT_VECTOR);
+		auto &validity = FlatVector::Validity(result);
+		UnifiedReader<string_t> game_reader;
+		UnifiedReader<string_t> fen_reader;
+		game_reader.Init(args.data[0], count);
+		fen_reader.Init(args.data[2], count);
+
+		auto out = FlatVector::GetData<bool>(result);
+		for (idx_t i = 0; i < count; i++) {
+			if (game_reader.IsNull(i)) {
+				validity.SetInvalid(i);
+				continue;
+			}
+
+			auto game = game_reader.Get(i);
+			diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+
+			out[i] = fen_reader.IsNull(i)
+			             ? UnwrapDecoded(query->matches(data), "scoutfish_query")
+			             : UnwrapDecoded(
+			                   query->matches_from_fen(
+			                       data,
+			                       std::string_view(fen_reader.Get(i).GetData(), fen_reader.Get(i).GetSize())),
+			                   "scoutfish_query");
+		}
 	} else if constexpr (PLIES && !FROM_FEN) {
 		GenericExecutor::ExecuteUnary<PrimitiveType<string_t>, GenericListType<PrimitiveType<uint16_t>>>(
 		    game_vector, result, count, [&](PrimitiveType<string_t> game) {
@@ -154,50 +172,67 @@ inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &resu
 			    return plies_list;
 		    });
 	} else {
-		GenericExecutor::ExecuteBinary<PrimitiveType<string_t>, PrimitiveType<string_t>,
-		                              GenericListType<PrimitiveType<uint16_t>>>(
-		    args.data[0], args.data[2], result, count,
-		    [&](PrimitiveType<string_t> game, PrimitiveType<string_t> initial_fen) {
-			    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.val.GetData()), game.val.GetSize()};
-			    const auto plies_data_size = 16;
-			    uint32_t plies_data[plies_data_size] = {0};
-			    const auto query_result = UnwrapDecoded(
-			        query->matches_plies_from_fen(
-			            data, std::string_view(initial_fen.val.GetData(), initial_fen.val.GetSize()), {plies_data, 16}),
-			        "scoutfish_query_plies");
+		result.SetVectorType(VectorType::FLAT_VECTOR);
+		auto &validity = FlatVector::Validity(result);
+		UnifiedReader<string_t> game_reader;
+		UnifiedReader<string_t> fen_reader;
+		game_reader.Init(args.data[0], count);
+		fen_reader.Init(args.data[2], count);
 
-			    const auto len = query_result & 0b1111111111111111;
-			    const auto min = static_cast<uint16_t>(query_result >> 16);
+		for (idx_t row = 0; row < count; row++) {
+			if (game_reader.IsNull(row)) {
+				validity.SetInvalid(row);
+				continue;
+			}
 
-			    GenericListType<PrimitiveType<uint16_t>> plies_list;
-			    auto added = 0;
-			    for (auto i = 0; i < plies_data_size; i++) {
-				    auto plies_data_curr = plies_data[i];
-				    if (plies_data_curr == 0) {
-					    continue;
-				    }
+			auto game = game_reader.Get(row);
+			diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+			const auto plies_data_size = 16;
+			uint32_t plies_data[plies_data_size] = {0};
+
+			auto query_result = fen_reader.IsNull(row)
+			                      ? UnwrapDecoded(query->matches_plies(data, {plies_data, 16}),
+			                                     "scoutfish_query_plies")
+			                      : UnwrapDecoded(
+			                            query->matches_plies_from_fen(
+			                                data,
+			                                std::string_view(fen_reader.Get(row).GetData(), fen_reader.Get(row).GetSize()),
+			                                {plies_data, 16}),
+			                            "scoutfish_query_plies");
+
+			const auto len = query_result & 0b1111111111111111;
+			const auto min = static_cast<uint16_t>(query_result >> 16);
+
+			GenericListType<PrimitiveType<uint16_t>> plies_list;
+			auto added = 0;
+			for (auto i = 0; i < plies_data_size; i++) {
+				auto plies_data_curr = plies_data[i];
+				if (plies_data_curr == 0) {
+					continue;
+				}
 
 #if __cplusplus >= 201907L
-				    auto start = std::countr_zero(plies_data_curr);
-				    auto end = 32 - std::countl_zero(plies_data_curr);
+				auto start = std::countr_zero(plies_data_curr);
+				auto end = 32 - std::countl_zero(plies_data_curr);
 #else
-					auto start = 0;
-					auto end = 32;
+				auto start = 0;
+				auto end = 32;
 #endif
 
-				    for (auto j = start; j < end; j++) {
-					    if (plies_data[i] & (1u << j)) {
-						    auto ply = static_cast<uint16_t>(i * 32 + j) + min;
-						    plies_list.values.push_back(PrimitiveType<uint16_t>(ply));
-						    added++;
-					    }
-				    }
-				    if (added >= len) {
-					    break;
-				    }
-			    }
-			    return plies_list;
-		    });
+				for (auto j = start; j < end; j++) {
+					if (plies_data[i] & (1u << j)) {
+						auto ply = static_cast<uint16_t>(i * 32 + j) + min;
+						plies_list.values.push_back(PrimitiveType<uint16_t>(ply));
+						added++;
+					}
+				}
+				if (added >= len) {
+					break;
+				}
+			}
+
+			GenericListType<PrimitiveType<uint16_t>>::AssignResult(result, row, plies_list);
+		}
 	}
 }
 
