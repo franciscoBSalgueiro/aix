@@ -28,3 +28,25 @@ query I
 SELECT TRY(to_pgn('invalid'::BLOB));
 ----
 NULL
+
+# Two variations of the same parent move must retain the branch position.
+query I
+SELECT to_pgn(from_hex('0C1CFFFF0C143E2DFFFEFFFF0B1B3323FFFE342400'));
+----
+1. e4 (1. e3 Nf6) (1. d4 d5) 1... e5
+
+# Malformed variation markers must report an error rather than panic.
+query I
+SELECT TRY(to_pgn(from_hex('FFFF00')));
+----
+NULL
+
+query I
+SELECT TRY(to_pgn(from_hex('0C1CFFFE00')));
+----
+NULL
+
+query I
+SELECT TRY(to_pgn(from_hex('0C1CFFFF0B1B00')));
+----
+NULL

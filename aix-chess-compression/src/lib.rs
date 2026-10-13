@@ -385,6 +385,7 @@ impl<'a> Decoder<'a> {
         struct Frame {
             pos_before_branch_move: Chess,
             ply: u32,
+            pos_before_last_move: Option<Chess>,
         }
 
         let mut stack: Vec<Frame> = vec![];
@@ -435,12 +436,13 @@ impl<'a> Decoder<'a> {
                     // before the last move on this line.
                     let branch_pos = pos_before_last_move
                         .clone()
-                        .expect("StartVariation before any move");
-                    let branch_ply = ply - 1; // the ply the variation starts at
+                        .ok_or(DecodeError {})?;
+                    let branch_ply = ply.checked_sub(1).ok_or(DecodeError {})?;
 
                     stack.push(Frame {
                         pos_before_branch_move: pos.clone(),
                         ply,
+                        pos_before_last_move: pos_before_last_move.clone(),
                     });
 
                     // Start the variation
@@ -458,18 +460,21 @@ impl<'a> Decoder<'a> {
                     s.push(')');
                     needs_space = true;
 
-                    let frame = stack.pop().expect("EndVariation without matching StartVariation");
+                    let frame = stack.pop().ok_or(DecodeError {})?;
                     pos = frame.pos_before_branch_move;
                     decoder.set_position(pos.clone());
                     ply = frame.ply;
                     // After a variation closes, the next move always needs a move number
                     // indicator in PGN, regardless of what the parent state was.
                     first_in_line = true;
-                    pos_before_last_move = None; // reset; next move will set it
+                    pos_before_last_move = frame.pos_before_last_move;
                 }
             }
         }
 
+        if !stack.is_empty() {
+            return Err(DecodeError {});
+        }
         Ok(s)
     }
 
@@ -889,5 +894,30 @@ mod tests {
         let decoder_full = Decoder::new(&restored);
         let full_pgn = decoder_full.into_pgn_string_with_variations().unwrap();
         assert_eq!(full_pgn, "1. e4 e5 (1... d5) 2. Nf3");
+    }
+
+    #[test]
+    fn pgn_sibling_variations_restore_the_parent_branch_point() {
+        let bytes = [
+            12, 28, 255, 255, 12, 20, 62, 45, 255, 254,
+            255, 255, 11, 27, 51, 35, 255, 254, 52, 36, 0,
+        ];
+        let game = EncodedGame::from_bytes(&bytes).unwrap();
+        assert_eq!(
+            Decoder::new(&game).into_pgn_string_with_variations().unwrap(),
+            "1. e4 (1. e3 Nf6) (1. d4 d5) 1... e5"
+        );
+    }
+
+    #[test]
+    fn malformed_variation_markers_return_errors() {
+        for bytes in [
+            vec![255, 255, 0],
+            vec![12, 28, 255, 254, 0],
+            vec![12, 28, 255, 255, 11, 27, 0],
+        ] {
+            let game = EncodedGame::from_bytes(&bytes).unwrap();
+            assert!(Decoder::new(&game).into_pgn_string_with_variations().is_err());
+        }
     }
 }
