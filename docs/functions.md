@@ -53,6 +53,28 @@ When `initial_fen` is provided, decoding starts from that position for LOW-compr
 Negative integers are accepted, the final position is -1. However, it is faster to pass a positive integer based on the `ply_count` column, if available: `-N` is equal to `ply_count::smallint - N + 1`.
 
 
+## next_move_at_fen
+
+`next_move_at_fen(movedata BLOB, target_fen VARCHAR) -> VARCHAR`
+
+`next_move_at_fen(movedata BLOB, target_fen VARCHAR, initial_fen VARCHAR) -> VARCHAR`
+
+Returns the move following the first matching mainline position, in UCI notation
+(for example `e2e4` or `a7a8q`). Returns `'*'` if that position ends the game, and
+`NULL` if the position is absent. Variations are skipped. Matching includes the
+side to move, castling rights, and legal en-passant square, but ignores move
+counters. `target_fen` must be constant for the query.
+
+The search and next-move extraction share one decoding pass. LOW-encoded games
+from the standard initial position can first be screened using their raw
+home-pawn departure history. For targets without home pawns, games whose
+mainline never loses all home pawns are rejected before decoding. It requires
+no persistent index or result cache.
+
+An explicit `initial_fen` is supported for LOW compression; Medium and High
+retain their standard starting position. NULL uses the standard starting
+position. Castling moves use the king's destination square.
+
 ## is_valid_movedata
 
 `is_valid_movedata(movedata BLOB) -> BOOLEAN`

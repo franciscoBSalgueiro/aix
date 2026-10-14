@@ -1,0 +1,45 @@
+# name: test/sql/next_move_at_fen.test
+# description: fused position matching and next move, including custom starts
+# group: [sql]
+
+require aixchess
+
+query T
+SELECT next_move_at_fen(from_hex('0c1c00'), 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -');
+----
+e2e4
+
+query T
+SELECT next_move_at_fen(from_hex('0c1c00'), 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -', NULL);
+----
+*
+
+query T
+SELECT next_move_at_fen(from_hex('0b1b00'), 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -');
+----
+NULL
+
+query T
+SELECT next_move_at_fen(from_hex('0c1cffff0b1bfffe342400'), 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq -');
+----
+e7e5
+
+query T
+SELECT next_move_at_fen(from_hex('040700'), '4k3/8/8/8/8/8/8/4K2R w K -', '4k3/8/8/8/8/8/8/4K2R w K -');
+----
+e1g1
+
+query T
+SELECT next_move_at_fen(from_hex('703800'), '7k/P7/8/8/8/8/8/7K w - -', '7k/P7/8/8/8/8/8/7K w - -');
+----
+a7a8q
+
+query T
+SELECT next_move_at_fen(NULL::BLOB, '7k/P7/8/8/8/8/8/7K w - -');
+----
+NULL
+
+query T
+SELECT next_move_at_fen(from_hex('0c1c00'), NULL::VARCHAR);
+----
+NULL

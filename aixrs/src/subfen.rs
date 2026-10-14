@@ -234,10 +234,9 @@ pub fn next_move_at_fen(
 ) -> Result<u32, crate::ffi::DecodeError> {
     let encoded = EncodedGame::from_bytes(game)?;
     let target_home = get_pawn_home_for_fen(fen);
-    // With no home pawns the extra scan is slower than decoding directly.
+    // Reject impossible home-pawn histories before reconstructing boards.
     // Custom starts and other encodings retain the general decoder path.
-    if target_home != 0
-        && initial_fen.is_none()
+    if initial_fen.is_none()
         && encoded.compression_level() == CompressionLevel::Low
         && home_pawns_exclude(game, target_home)
     {
@@ -300,13 +299,38 @@ fn home_pawns_exclude(game: &[u8], target: u16) -> bool {
         if !is_end_reachable(target, home) { return true; }
         if home == target { return false; }
     }
-    false
+    // A zero mask is reachable only if every home pawn departed or was
+    // captured on the mainline. If it never occurred, decoding cannot match.
+    target == 0 && depth == 0
 }
 
 #[cfg(test)]
 mod next_move_tests {
     use super::*;
     use aix_chess_compression::{Encode, Encoder};
+
+    #[test]
+    fn zero_home_prefilter_tracks_mainline_and_falls_back_on_bad_markers() {
+        assert!(home_pawns_exclude(&[0], 0));
+        assert!(home_pawns_exclude(&[12, 28, 0], 0));
+        let mut departed = Vec::new();
+        for sq in (8..16).chain(48..56) {
+            departed.extend_from_slice(&[sq, 24]);
+        }
+        departed.push(0);
+        assert!(!home_pawns_exclude(&departed, 0));
+        // Captures on a home square also remove that pawn from the mask.
+        departed[30] = 24 | 128;
+        departed[31] = 55;
+        assert!(!home_pawns_exclude(&departed, 0));
+        let mut variation = vec![255, 255, 255, 255];
+        variation.extend_from_slice(&departed[..departed.len() - 1]);
+        variation.extend_from_slice(&[255, 254, 255, 254, 0]);
+        assert!(home_pawns_exclude(&variation, 0));
+        for malformed in [vec![255, 255, 0], vec![255, 254, 0], vec![255, 1, 0], vec![12, 0]] {
+            assert!(!home_pawns_exclude(&malformed, 0));
+        }
+    }
 
     fn check(target: &str, bytes: &[u8], initial: Option<&str>, expected: Option<u32>) {
         let fen = try_parse_fen(target.as_bytes()).unwrap();
