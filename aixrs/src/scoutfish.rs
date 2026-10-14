@@ -3,7 +3,9 @@ use std::{io::Write, str::FromStr};
 use crate::ffi::{ScoutfishQueryParseError, Subfen};
 use aix_chess_compression::{Decode, Decoder, EncodedGame};
 use serde::Deserialize;
-use shakmaty::{CastlingMode, Chess, Color, FromSetup, Move, Position, fen::Fen as ShakmatyFen, san::San};
+use shakmaty::{
+    fen::Fen as ShakmatyFen, san::San, CastlingMode, Chess, Color, FromSetup, Move, Position,
+};
 
 #[derive(Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
@@ -474,7 +476,14 @@ impl Rule {
                         shakmaty::Role::Rook => captured.r,
                         shakmaty::Role::Queen => captured.q,
                     },
-                    None => false,
+                    None => {
+                        !(captured.k
+                            || captured.p
+                            || captured.n
+                            || captured.b
+                            || captured.r
+                            || captured.q)
+                    }
                 };
 
                 if !in_captured {
@@ -871,6 +880,83 @@ impl Query {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_quiet_moves_in_encoded_game_queries() {
+        use aix_chess_compression::{CompressionLevel, Encode, Encoder};
+        let mut encoder = Encoder::new(CompressionLevel::Low);
+        let mut pos = Chess::new();
+        for san in ["e4", "d5", "exd5", "Qxd5", "Nf3"] {
+            let mv = San::from_ascii(san.as_bytes())
+                .unwrap()
+                .to_move(&pos)
+                .unwrap();
+            encoder.encode_move(mv).unwrap();
+            pos.play_unchecked(mv);
+        }
+        let game = encoder.finish();
+        for (json, plies) in [
+            (r#"{"captured":""}"#, vec![0]),
+            (
+                r#"{"streak":[{"captured":""},{"captured":"P"}]}"#,
+                vec![1, 2],
+            ),
+            (
+                r#"{"sequence":[{"captured":""},{"captured":"P"},{"captured":""}]}"#,
+                vec![0, 2, 4],
+            ),
+        ] {
+            let query = Query::parse(json.as_bytes()).unwrap();
+            assert_eq!(
+                query.apply(&game, true).ok().unwrap(),
+                (true, Some(plies)),
+                "{json}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_quiet_move_matching() {
+        let Query::Rule(quiet) = Query::parse(br#"{"captured":""}"#).unwrap() else {
+            panic!("expected a rule");
+        };
+        let cases = [
+            (
+                "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                "Nf3",
+                true,
+            ),
+            ("4k3/8/8/3p4/4P3/8/8/4K3 w - - 0 1", "exd5", false),
+            ("4k3/8/8/8/8/8/8/4K2R w K - 0 1", "O-O", true),
+            ("4k3/P7/8/8/8/8/8/4K3 w - - 0 1", "a8=Q", true),
+            ("1r2k3/P7/8/8/8/8/8/4K3 w - - 0 1", "axb8=Q", false),
+            ("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1", "exd6", false),
+        ];
+        for (fen, san, expected) in cases {
+            let pos = Query::initial_position(Some(fen)).ok().unwrap();
+            let mv = San::from_ascii(san.as_bytes())
+                .unwrap()
+                .to_move(&pos)
+                .unwrap();
+            assert_eq!(quiet.apply(Some(mv), &pos), expected, "{san} in {fen}");
+        }
+        assert!(!quiet.apply(None, &Chess::new()));
+    }
+
+    #[test]
+    fn test_captured_piece_matching_excludes_quiet_moves() {
+        let Query::Rule(captured) = Query::parse(br#"{"captured":"P"}"#).unwrap() else {
+            panic!("expected a rule");
+        };
+        let pos = Chess::new();
+        let mv = San::from_ascii(b"Nf3").unwrap().to_move(&pos).unwrap();
+        assert!(!captured.apply(Some(mv), &pos));
+        let pos = Query::initial_position(Some("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1"))
+            .ok()
+            .unwrap();
+        let mv = San::from_ascii(b"exd6").unwrap().to_move(&pos).unwrap();
+        assert!(captured.apply(Some(mv), &pos));
+    }
 
     #[test]
     fn test_parse_rule1() {

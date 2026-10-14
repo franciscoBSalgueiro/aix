@@ -1,0 +1,38 @@
+# name: test/sql/scoutfish_quiet_moves.test
+# description: quiet move matching and capture exclusion
+# group: [sql]
+
+require aixchess
+
+statement ok
+CREATE TABLE quiet_move_fixture AS SELECT '\x0C\x1C4$\x05\x1A9*\x06\x151)\x04\x07>-\x0A\x12=\x22\x9A5\xBC5\x15&5>\x03\x11-#\x91#>=#5\x00'::BLOB AS movedata;
+
+query I
+SELECT scoutfish_query(movedata, '{"captured":""}') FROM quiet_move_fixture;
+----
+true
+
+query I
+SELECT scoutfish_query(movedata, '{"white-move":"O-O","captured":""}') FROM quiet_move_fixture;
+----
+true
+
+query I
+SELECT scoutfish_query(movedata, '{"white-move":"Bxf7+","captured":""}') FROM quiet_move_fixture;
+----
+false
+
+query I
+SELECT scoutfish_query(movedata, '{"white-move":"Bxf7+","captured":"P"}') FROM quiet_move_fixture;
+----
+true
+
+query I
+SELECT scoutfish_query(movedata, '{"streak":[{"white-move":"O-O","captured":""},{"black-move":"Nf6","captured":""}]}') FROM quiet_move_fixture;
+----
+true
+
+query I
+SELECT scoutfish_query(movedata, '{"sequence":[{"white-move":"O-O","captured":""},{"moved":"B","captured":"P"}]}') FROM quiet_move_fixture;
+----
+true
