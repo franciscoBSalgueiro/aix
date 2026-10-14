@@ -67,9 +67,11 @@ counters. `target_fen` must be constant for the query.
 
 The search and next-move extraction share one decoding pass. LOW-encoded games
 from the standard initial position can first be screened using their raw
-home-pawn departure history. For targets without home pawns, games whose
-mainline never loses all home pawns are rejected before decoding. It requires
-no persistent index or result cache.
+home-pawn departure history and capture count. Games whose mainline never has
+both the required home pawns and total piece count are rejected before decoding.
+Decoding also stops once fewer pieces remain than the target requires, because
+promotions preserve total piece count. This requires no persistent index or
+result cache.
 
 An explicit `initial_fen` is supported for LOW compression; Medium and High
 retain their standard starting position. NULL uses the standard starting

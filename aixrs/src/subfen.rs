@@ -234,11 +234,12 @@ pub fn next_move_at_fen(
 ) -> Result<u32, crate::ffi::DecodeError> {
     let encoded = EncodedGame::from_bytes(game)?;
     let target_home = get_pawn_home_for_fen(fen);
-    // Reject impossible home-pawn histories before reconstructing boards.
+    let target_count = (fen.white | fen.black).count_ones() as usize;
+    // Reject impossible home-pawn and capture histories before reconstructing boards.
     // Custom starts and other encodings retain the general decoder path.
     if initial_fen.is_none()
         && encoded.compression_level() == CompressionLevel::Low
-        && home_pawns_exclude(game, target_home)
+        && home_pawns_exclude(game, target_home, target_count)
     {
         return Err(crate::ffi::DecodeError::NoErrorNoValue);
     }
@@ -251,7 +252,8 @@ pub fn next_move_at_fen(
                 return Err(crate::ffi::DecodeError::NoErrorNoValue);
             };
             let position = position?;
-            if !is_end_reachable(target_home, get_pawn_home(position.board())) {
+            if position.board().occupied().count() < target_count
+                || !is_end_reachable(target_home, get_pawn_home(position.board())) {
                 return Err(crate::ffi::DecodeError::NoErrorNoValue);
             }
             if matches_fen_state(fen, position) {
@@ -273,10 +275,12 @@ pub fn next_move_at_fen(
 
 /// Low encoding stores source/destination in two-byte records. Home pawns
 /// cannot return, so departures/captures can rule out a target without boards.
-/// Stop at the first compatible mask; never follow variation records.
-fn home_pawns_exclude(game: &[u8], target: u16) -> bool {
+/// Captures reduce total piece count; promotions preserve it. Stop at the first
+/// compatible mask and piece count; never follow variation records.
+fn home_pawns_exclude(game: &[u8], target: u16, target_count: usize) -> bool {
     let mut home = u16::MAX;
-    if target == home || game.len() % 2 != 1 { return false; }
+    let mut count = 32usize;
+    if (target == home && target_count == count) || game.len() % 2 != 1 { return false; }
     let mut depth = 0u32;
     for pair in game[..game.len() - 1].chunks_exact(2) {
         match pair {
@@ -292,16 +296,20 @@ fn home_pawns_exclude(game: &[u8], target: u16) -> bool {
         if depth != 0 { continue; }
         let from = pair[0] & 63;
         let captured = if pair[0] & 128 != 0 { Some(pair[1] & 63) } else { None };
+        if captured.is_some() {
+            if count == 0 { return false; }
+            count -= 1;
+        }
+        if count < target_count { return true; }
         for sq in [Some(from), captured].into_iter().flatten() {
             if (8..16).contains(&sq) { home &= !(1 << (sq - 8)); }
             if (48..56).contains(&sq) { home &= !(1 << (sq - 40)); }
         }
         if !is_end_reachable(target, home) { return true; }
-        if home == target { return false; }
+        if home == target && count == target_count { return false; }
     }
-    // A zero mask is reachable only if every home pawn departed or was
-    // captured on the mainline. If it never occurred, decoding cannot match.
-    target == 0 && depth == 0
+    // No mainline position had both the required home pawns and piece count.
+    depth == 0
 }
 
 #[cfg(test)]
@@ -310,25 +318,39 @@ mod next_move_tests {
     use aix_chess_compression::{Encode, Encoder};
 
     #[test]
+    fn capture_prefilter_requires_compatible_count_on_mainline() {
+        let home = u16::MAX;
+        assert!(home_pawns_exclude(&[0], home, 31));
+        assert!(!home_pawns_exclude(&[24 | 128, 32, 0], home, 31));
+        assert!(home_pawns_exclude(&[24 | 128, 32, 0], home, 30));
+        // Captures inside nested variations must not reduce mainline material.
+        assert!(home_pawns_exclude(&[255, 255, 255, 255, 152, 32, 255, 254, 255, 254, 0], home, 31));
+        // Promotion alone preserves total material; capture-promotion loses one.
+        let missing_a7 = home & !(1 << 8);
+        assert!(home_pawns_exclude(&[48 | 64, 56, 0], missing_a7, 31));
+        assert!(!home_pawns_exclude(&[48 | 64 | 128, 57, 0], missing_a7, 31));
+    }
+
+    #[test]
     fn zero_home_prefilter_tracks_mainline_and_falls_back_on_bad_markers() {
-        assert!(home_pawns_exclude(&[0], 0));
-        assert!(home_pawns_exclude(&[12, 28, 0], 0));
+        assert!(home_pawns_exclude(&[0], 0, 32));
+        assert!(home_pawns_exclude(&[12, 28, 0], 0, 32));
         let mut departed = Vec::new();
         for sq in (8..16).chain(48..56) {
             departed.extend_from_slice(&[sq, 24]);
         }
         departed.push(0);
-        assert!(!home_pawns_exclude(&departed, 0));
+        assert!(!home_pawns_exclude(&departed, 0, 32));
         // Captures on a home square also remove that pawn from the mask.
         departed[30] = 24 | 128;
         departed[31] = 55;
-        assert!(!home_pawns_exclude(&departed, 0));
+        assert!(!home_pawns_exclude(&departed, 0, 31));
         let mut variation = vec![255, 255, 255, 255];
         variation.extend_from_slice(&departed[..departed.len() - 1]);
         variation.extend_from_slice(&[255, 254, 255, 254, 0]);
-        assert!(home_pawns_exclude(&variation, 0));
+        assert!(home_pawns_exclude(&variation, 0, 31));
         for malformed in [vec![255, 255, 0], vec![255, 254, 0], vec![255, 1, 0], vec![12, 0]] {
-            assert!(!home_pawns_exclude(&malformed, 0));
+            assert!(!home_pawns_exclude(&malformed, 0, 32));
         }
     }
 
