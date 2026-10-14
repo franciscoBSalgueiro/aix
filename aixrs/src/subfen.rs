@@ -223,3 +223,147 @@ fn matches_fen_state(fen: &Fen, position: &Chess) -> bool {
             .unwrap_or(-1)
             == fen.ep_square
 }
+
+/// Finds the first occurrence and returns its next move in one decoding pass.
+/// Zero means the game ended at the target. Otherwise the value is one plus
+/// from | (to << 6) | (promotion ASCII << 12). NoErrorNoValue means no match.
+pub fn next_move_at_fen(
+    fen: &Fen,
+    game: &[u8],
+    initial_fen: Option<&str>,
+) -> Result<u32, crate::ffi::DecodeError> {
+    let encoded = EncodedGame::from_bytes(game)?;
+    let target_home = get_pawn_home_for_fen(fen);
+    // With no home pawns the extra scan is slower than decoding directly.
+    // Custom starts and other encodings retain the general decoder path.
+    if target_home != 0
+        && initial_fen.is_none()
+        && encoded.compression_level() == CompressionLevel::Low
+        && home_pawns_exclude(game, target_home)
+    {
+        return Err(crate::ffi::DecodeError::NoErrorNoValue);
+    }
+
+    let initial = initial_position_for_matching(&encoded, initial_fen)?;
+    let mut decoder = Decoder::new_with_initial_fen(&encoded, initial_fen)?;
+    if !matches_fen_state(fen, &initial) {
+        loop {
+            let Some(position) = decoder.next_position() else {
+                return Err(crate::ffi::DecodeError::NoErrorNoValue);
+            };
+            let position = position?;
+            if !is_end_reachable(target_home, get_pawn_home(position.board())) {
+                return Err(crate::ffi::DecodeError::NoErrorNoValue);
+            }
+            if matches_fen_state(fen, position) {
+                break;
+            }
+        }
+    }
+
+    let Some(m) = decoder.next_move() else { return Ok(0); };
+    let m = m?;
+    let to = if let shakmaty::Move::Castle { king, rook } = m {
+        let side = shakmaty::CastlingSide::from_king_side(king < rook);
+        shakmaty::Square::from_coords(side.king_to_file(), king.rank())
+    } else { m.to() };
+    let from = m.from().ok_or(crate::ffi::DecodeError::InvalidDataDuringDecoding)?;
+    let promotion = m.promotion().map(|p| p.char() as u32).unwrap_or(0);
+    Ok(1 + (from as u32 | ((to as u32) << 6) | (promotion << 12)))
+}
+
+/// Low encoding stores source/destination in two-byte records. Home pawns
+/// cannot return, so departures/captures can rule out a target without boards.
+/// Stop at the first compatible mask; never follow variation records.
+fn home_pawns_exclude(game: &[u8], target: u16) -> bool {
+    let mut home = u16::MAX;
+    if target == home || game.len() % 2 != 1 { return false; }
+    let mut depth = 0u32;
+    for pair in game[..game.len() - 1].chunks_exact(2) {
+        match pair {
+            [255, 255] => { depth += 1; continue; }
+            [255, 254] => {
+                if depth == 0 { return false; }
+                depth -= 1;
+                continue;
+            }
+            [255, _] => return false,
+            _ => {}
+        }
+        if depth != 0 { continue; }
+        let from = pair[0] & 63;
+        let captured = if pair[0] & 128 != 0 { Some(pair[1] & 63) } else { None };
+        for sq in [Some(from), captured].into_iter().flatten() {
+            if (8..16).contains(&sq) { home &= !(1 << (sq - 8)); }
+            if (48..56).contains(&sq) { home &= !(1 << (sq - 40)); }
+        }
+        if !is_end_reachable(target, home) { return true; }
+        if home == target { return false; }
+    }
+    false
+}
+
+#[cfg(test)]
+mod next_move_tests {
+    use super::*;
+    use aix_chess_compression::{Encode, Encoder};
+
+    fn check(target: &str, bytes: &[u8], initial: Option<&str>, expected: Option<u32>) {
+        let fen = try_parse_fen(target.as_bytes()).unwrap();
+        let actual = match next_move_at_fen(&fen, bytes, initial) {
+            Ok(m) => Some(m),
+            Err(crate::ffi::DecodeError::NoErrorNoValue) => None,
+            Err(_) => panic!("unexpected decode error"),
+        };
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn special_moves_and_terminal_positions() {
+        let initial = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        let e4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+        check(initial, &[12, 28, 0], None, Some(1 + 12 + (28 << 6)));
+        check(e4, &[12, 28, 0], None, Some(0));
+        check(e4, &[11, 27, 0], None, None);
+        check(e4, &[12, 28, 255, 255, 11, 27, 255, 254, 52, 36, 0], None, Some(1 + 52 + (36 << 6)));
+        let castle = "4k3/8/8/8/8/8/8/4K2R w K - 0 1";
+        check(castle, &[4, 7, 0], Some(castle), Some(1 + 4 + (6 << 6)));
+        let promotion = "7k/P7/8/8/8/8/8/7K w - - 0 1";
+        check(promotion, &[48 | 64, 56, 0], Some(promotion), Some(1 + 48 + (56 << 6) + (('q' as u32) << 12)));
+        let ep = "7k/8/8/3pP3/8/8/8/7K w - d6 0 1";
+        check(ep, &[36 | 128, 43, 0], Some(ep), Some(1 + 36 + (43 << 6)));
+    }
+
+    #[test]
+    fn agrees_with_existing_search_across_encodings() {
+        // Deterministic legal games exercise captures, castling rights and
+        // arbitrary targets in all three formats, including absent positions.
+        for seed in 0..12usize {
+            let mut pos = Chess::new();
+            let mut positions = vec![pos.clone()];
+            let mut moves = Vec::new();
+            for ply in 0..100usize {
+                let legal = pos.legal_moves();
+                if legal.is_empty() { break; }
+                let m = legal[(seed * 31 + ply * 17) % legal.len()];
+                pos.play_unchecked(m);
+                moves.push(m);
+                positions.push(pos.clone());
+            }
+            for level in [CompressionLevel::Low, CompressionLevel::Medium, CompressionLevel::High] {
+                let mut encoder = Encoder::new(level);
+                for m in &moves { encoder.encode_move(*m).ok().unwrap(); }
+                let bytes = encoder.finish().into_bytes();
+                for pos in positions.iter().step_by(7) {
+                    let text = ShakmatyFen::from_position(pos, shakmaty::EnPassantMode::Legal).to_string();
+                    let target = try_parse_fen(text.as_bytes()).unwrap();
+                    let ply = matches_fen_ply(try_parse_fen(text.as_bytes()).unwrap(), &bytes).ok().unwrap();
+                    let expected = crate::game::from_bytes(&bytes).ok().unwrap();
+                    let expected = expected.move_details_iterator().0.nth(ply as usize).map(|m| m.ok().unwrap());
+                    let expected = expected.map(|m| 1 + m.from as u32 + ((m.to as u32) << 6) + ((m.promotion as u32) << 12)).unwrap_or(0);
+                    assert_eq!(next_move_at_fen(&target, &bytes, None).ok(), Some(expected));
+                }
+            }
+        }
+    }
+}

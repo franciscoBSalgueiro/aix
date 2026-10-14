@@ -184,9 +184,56 @@ inline void MatchesFenPlyFromFen(DataChunk &args, ExpressionState &state, Vector
 	}
 }
 
+// NULL means absent; '*' means the first matching position ends the game.
+void NextMoveAtFen(DataChunk &args, ExpressionState &state, Vector &result) {
+    auto &expr = state.expr.Cast<BoundFunctionExpression>();
+    auto &info = expr.bind_info->Cast<MatchesFenBindData>();
+    if (info.is_null) {
+        result.SetVectorType(VectorType::CONSTANT_VECTOR);
+        ConstantVector::SetNull(result, true);
+        return;
+    }
+    auto fen = info.fen;
+    UnifiedReader<string_t> games, starts;
+    games.Init(args.data[0], args.size());
+    const bool has_start = args.ColumnCount() == 3;
+    if (has_start) starts.Init(args.data[2], args.size());
+    result.SetVectorType(VectorType::FLAT_VECTOR);
+    auto &validity = FlatVector::Validity(result);
+    auto out = FlatVector::GetData<string_t>(result);
+    for (idx_t i = 0; i < args.size(); i++) {
+        if (games.IsNull(i)) { validity.SetInvalid(i); continue; }
+        auto game = games.Get(i);
+        diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+        std::optional<uint32_t> next;
+        if (has_start && !starts.IsNull(i)) {
+            auto start = starts.Get(i);
+            next = UnwrapOptionalDecoded<uint32_t>(fen.next_move_at_fen_from_fen(
+                data, std::string_view(start.GetData(), start.GetSize())), "next_move_at_fen");
+        } else {
+            next = UnwrapOptionalDecoded<uint32_t>(fen.next_move_at_fen(data), "next_move_at_fen");
+        }
+        if (!next.has_value()) { validity.SetInvalid(i); continue; }
+        if (*next == 0) { out[i] = StringVector::AddString(result, "*"); continue; }
+        const auto code = *next - 1;
+        const auto from = code & 63, to = (code >> 6) & 63, promotion = code >> 12;
+        const char uci[] = {char('a' + from % 8), char('1' + from / 8),
+                            char('a' + to % 8), char('1' + to / 8), char(promotion)};
+        out[i] = StringVector::AddString(result, uci, promotion ? 5 : 4);
+    }
+}
+
 } // namespace
 
 void Register_MatchesFen(ExtensionLoader &loader) {
+    for (bool custom_start : {false, true}) {
+        vector<LogicalType> types = {LogicalType::BLOB, LogicalType::VARCHAR};
+        if (custom_start) types.push_back(LogicalType::VARCHAR);
+        auto function = ScalarFunction("next_move_at_fen", types, LogicalType::VARCHAR,
+                                       NextMoveAtFen, MatchesFenBindFunction);
+        function.null_handling = FunctionNullHandling::SPECIAL_HANDLING;
+        loader.RegisterFunction(function);
+    }
 	auto matches_fen_function = ScalarFunction("matches_fen", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                                           LogicalType::BOOLEAN, MatchesFen, MatchesFenBindFunction);
 	loader.RegisterFunction(matches_fen_function);

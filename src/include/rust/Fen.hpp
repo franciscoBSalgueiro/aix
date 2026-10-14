@@ -26,6 +26,12 @@ namespace capi {
     typedef struct Fen_matches_fen_ply_result {union {uint16_t ok; diplomat::capi::DecodeError err;}; bool is_ok;} Fen_matches_fen_ply_result;
     Fen_matches_fen_ply_result Fen_matches_fen_ply(diplomat::capi::Fen self, diplomat::capi::DiplomatU8View game);
 
+    typedef struct Fen_next_move_at_fen_result {union {uint32_t ok; diplomat::capi::DecodeError err;}; bool is_ok;} Fen_next_move_at_fen_result;
+    Fen_next_move_at_fen_result Fen_next_move_at_fen(diplomat::capi::Fen self, diplomat::capi::DiplomatU8View game);
+
+    typedef struct Fen_next_move_at_fen_from_fen_result {union {uint32_t ok; diplomat::capi::DecodeError err;}; bool is_ok;} Fen_next_move_at_fen_from_fen_result;
+    Fen_next_move_at_fen_from_fen_result Fen_next_move_at_fen_from_fen(diplomat::capi::Fen self, diplomat::capi::DiplomatU8View game, diplomat::capi::DiplomatStringView initial_fen);
+
     typedef struct Fen_matches_fen_from_fen_result {union {bool ok; diplomat::capi::DecodeError err;}; bool is_ok;} Fen_matches_fen_from_fen_result;
     Fen_matches_fen_from_fen_result Fen_matches_fen_from_fen(diplomat::capi::Fen self, diplomat::capi::DiplomatU8View game, diplomat::capi::DiplomatStringView initial_fen);
 
@@ -68,6 +74,16 @@ inline diplomat::result<uint16_t, DecodeError> Fen::matches_fen_ply_from_fen(dip
   return result.is_ok ? diplomat::result<uint16_t, DecodeError>(diplomat::Ok<uint16_t>(result.ok)) : diplomat::result<uint16_t, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
 }
 
+
+inline diplomat::result<uint32_t, DecodeError> Fen::next_move_at_fen(diplomat::span<const uint8_t> game) {
+  auto result = diplomat::capi::Fen_next_move_at_fen(this->AsFFI(), {game.data(), game.size()});
+  return result.is_ok ? diplomat::result<uint32_t, DecodeError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
+
+inline diplomat::result<uint32_t, DecodeError> Fen::next_move_at_fen_from_fen(diplomat::span<const uint8_t> game, std::string_view initial_fen) {
+  auto result = diplomat::capi::Fen_next_move_at_fen_from_fen(this->AsFFI(), {game.data(), game.size()}, {initial_fen.data(), initial_fen.size()});
+  return result.is_ok ? diplomat::result<uint32_t, DecodeError>(diplomat::Ok<uint32_t>(result.ok)) : diplomat::result<uint32_t, DecodeError>(diplomat::Err<DecodeError>(DecodeError::FromFFI(result.err)));
+}
 
 inline diplomat::capi::Fen Fen::AsFFI() const {
   return diplomat::capi::Fen {

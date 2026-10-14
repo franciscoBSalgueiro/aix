@@ -320,6 +320,16 @@ mod ffi {
     }
 
     impl Fen {
+        pub fn next_move_at_fen(self, game: &[u8]) -> Result<u32, DecodeError> {
+            crate::subfen::next_move_at_fen(&self, game, None)
+        }
+
+        pub fn next_move_at_fen_from_fen(
+            self, game: &[u8], initial_fen: &str,
+        ) -> Result<u32, DecodeError> {
+            crate::subfen::next_move_at_fen(&self, game, Some(initial_fen))
+        }
+
         pub fn parse(fen: &DiplomatStr) -> Result<Fen, ()> {
             crate::subfen::try_parse_fen(fen).map_err(|_| ())
         }
