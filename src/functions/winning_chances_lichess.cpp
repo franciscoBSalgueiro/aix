@@ -36,7 +36,7 @@ inline void LichessWinningChances(DataChunk &args, ExpressionState &state, Vecto
 void Register_LichessWinningChances(ExtensionLoader &loader) {
 	auto lichess_winning_chances_function =
 	    ScalarFunction("winning_chances_lichess", {LogicalType::SMALLINT}, LogicalType::DOUBLE, LichessWinningChances);
-	loader.RegisterFunction(lichess_winning_chances_function);
+	RegisterAixFunction(loader, lichess_winning_chances_function);
 }
 
 } // namespace duckdb

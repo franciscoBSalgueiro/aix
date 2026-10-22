@@ -26,7 +26,7 @@ inline void Recompress(DataChunk &args, ExpressionState &state, Vector &result) 
 void Register_Recompress(ExtensionLoader &loader) {
 	auto recompress_function =
 	    ScalarFunction("recompress", {LogicalType::BLOB, LogicalType::UTINYINT}, LogicalType::BLOB, Recompress);
-	loader.RegisterFunction(recompress_function);
+	RegisterAixFunction(loader, recompress_function);
 }
 
 } // namespace duckdb

@@ -16,7 +16,7 @@ struct BoardStruct {
 
 		auto &entries = StructVector::GetEntries(result);
 		for (auto j = 0; j < 64; j++) {
-			auto data = FlatVector::GetData<string_t>(*entries[j]);
+			auto data = FlatVector::GetDataMutable<string_t>(entries[j]);
 
 			auto c = value.board[j];
 			std::string p;
@@ -53,7 +53,7 @@ inline void BoardAtPosition(DataChunk &args, ExpressionState &state, Vector &res
 inline void BoardAtPositionFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<int32_t> pos_reader;
@@ -106,12 +106,12 @@ void Register_BoardAtPosition(ExtensionLoader &loader) {
 	}
 	auto board_pos_function = ScalarFunction("board_at_position", {LogicalType::BLOB, LogicalType::INTEGER},
 	                                         LogicalType::STRUCT(board_children), BoardAtPosition);
-	loader.RegisterFunction(board_pos_function);
+	RegisterAixFunction(loader, board_pos_function);
 
 	auto board_pos_from_fen_function =
 	    ScalarFunction("board_at_position", {LogicalType::BLOB, LogicalType::INTEGER, LogicalType::VARCHAR},
 	                   LogicalType::STRUCT(board_children), BoardAtPositionFromFen);
-	loader.RegisterFunction(board_pos_from_fen_function);
+	RegisterAixFunction(loader, board_pos_from_fen_function);
 }
 
 } // namespace duckdb

@@ -23,7 +23,7 @@ void Register_LichessTimeControl(ExtensionLoader &loader) {
 	auto lichess_time_control_function =
 	    ScalarFunction("time_control_lichess", {LogicalType::USMALLINT, LogicalType::UTINYINT}, LogicalType::VARCHAR,
 	                   LichessTimeControl);
-	loader.RegisterFunction(lichess_time_control_function);
+	RegisterAixFunction(loader, lichess_time_control_function);
 }
 
 } // namespace duckdb

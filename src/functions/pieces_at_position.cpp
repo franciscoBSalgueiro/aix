@@ -39,18 +39,18 @@ struct PiecesAtPositionResult {
 		// be inlined
 
 		auto &entries = StructVector::GetEntries(result);
-		STR::AssignResult(*entries[0], i, value.wk_val);
-		STR_LIST::AssignResult(*entries[1], i, value.wq_val);
-		STR_LIST::AssignResult(*entries[2], i, value.wr_val);
-		STR_LIST::AssignResult(*entries[3], i, value.wb_val);
-		STR_LIST::AssignResult(*entries[4], i, value.wn_val);
-		STR_LIST::AssignResult(*entries[5], i, value.wp_val);
-		STR::AssignResult(*entries[6], i, value.bk_val);
-		STR_LIST::AssignResult(*entries[7], i, value.bq_val);
-		STR_LIST::AssignResult(*entries[8], i, value.br_val);
-		STR_LIST::AssignResult(*entries[9], i, value.bb_val);
-		STR_LIST::AssignResult(*entries[10], i, value.bn_val);
-		STR_LIST::AssignResult(*entries[11], i, value.bp_val);
+		STR::AssignResult(entries[0], i, value.wk_val);
+		STR_LIST::AssignResult(entries[1], i, value.wq_val);
+		STR_LIST::AssignResult(entries[2], i, value.wr_val);
+		STR_LIST::AssignResult(entries[3], i, value.wb_val);
+		STR_LIST::AssignResult(entries[4], i, value.wn_val);
+		STR_LIST::AssignResult(entries[5], i, value.wp_val);
+		STR::AssignResult(entries[6], i, value.bk_val);
+		STR_LIST::AssignResult(entries[7], i, value.bq_val);
+		STR_LIST::AssignResult(entries[8], i, value.br_val);
+		STR_LIST::AssignResult(entries[9], i, value.bb_val);
+		STR_LIST::AssignResult(entries[10], i, value.bn_val);
+		STR_LIST::AssignResult(entries[11], i, value.bp_val);
 	}
 };
 
@@ -111,7 +111,7 @@ inline void PiecesAtPosition(DataChunk &args, ExpressionState &state, Vector &re
 inline void PiecesAtPositionFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<int32_t> pos_reader;
@@ -182,12 +182,12 @@ void Register_PiecesAtPosition(ExtensionLoader &loader) {
 
 	auto pieces_pos_function = ScalarFunction("pieces_at_position", {LogicalType::BLOB, LogicalType::INTEGER},
 	                                          LogicalType::STRUCT(piece_counts_children), PiecesAtPosition);
-	loader.RegisterFunction(pieces_pos_function);
+	RegisterAixFunction(loader, pieces_pos_function);
 
 	auto pieces_pos_from_fen_function =
 	    ScalarFunction("pieces_at_position", {LogicalType::BLOB, LogicalType::INTEGER, LogicalType::VARCHAR},
 	                   LogicalType::STRUCT(piece_counts_children), PiecesAtPositionFromFen);
-	loader.RegisterFunction(pieces_pos_from_fen_function);
+	RegisterAixFunction(loader, pieces_pos_from_fen_function);
 }
 
 } // namespace duckdb

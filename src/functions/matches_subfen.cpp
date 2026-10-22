@@ -24,8 +24,8 @@ struct MatchesSubfenBindData : public FunctionData {
 	}
 };
 
-static unique_ptr<FunctionData> MatchesSubfenBindFunction(ClientContext &context, ScalarFunction &bound_function,
-                                                          vector<unique_ptr<Expression>> &arguments) {
+static unique_ptr<FunctionData> MatchesSubfenBindFunction(BindScalarFunctionInput &input) {
+	auto &arguments = input.GetArguments();
 	auto &subfen_arg = arguments[1];
 	if (subfen_arg->HasParameter()) {
 		throw ParameterNotResolvedException();
@@ -33,7 +33,7 @@ static unique_ptr<FunctionData> MatchesSubfenBindFunction(ClientContext &context
 	if (!subfen_arg->IsFoldable()) {
 		throw InvalidInputException(*subfen_arg, "subfen must be a constant");
 	}
-	Value options_str = ExpressionExecutor::EvaluateScalar(context, *subfen_arg);
+	Value options_str = input.GetConstant(1);
 	auto subfen_string = options_str.GetValue<string>();
 	Subfen subfen;
 	bool is_null = options_str.IsNull();
@@ -49,7 +49,7 @@ static unique_ptr<FunctionData> MatchesSubfenBindFunction(ClientContext &context
 
 inline void MatchesSubfen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
-	auto &info = func_expr.bind_info->Cast<MatchesSubfenBindData>();
+	auto &info = func_expr.BindInfo()->Cast<MatchesSubfenBindData>();
 
 	if (info.is_null) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
@@ -70,7 +70,7 @@ inline void MatchesSubfen(DataChunk &args, ExpressionState &state, Vector &resul
 
 inline void MatchesSubfenFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
-	auto &info = func_expr.bind_info->Cast<MatchesSubfenBindData>();
+	auto &info = func_expr.BindInfo()->Cast<MatchesSubfenBindData>();
 
 	if (info.is_null) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
@@ -82,14 +82,14 @@ inline void MatchesSubfenFromFen(DataChunk &args, ExpressionState &state, Vector
 
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
 	game_reader.Init(args.data[0], count);
 	fen_reader.Init(args.data[2], count);
 
-	auto out = FlatVector::GetData<bool>(result);
+	auto out = FlatVector::GetDataMutable<bool>(result);
 	for (idx_t i = 0; i < count; i++) {
 		if (game_reader.IsNull(i)) {
 			validity.SetInvalid(i);
@@ -114,12 +114,12 @@ inline void MatchesSubfenFromFen(DataChunk &args, ExpressionState &state, Vector
 void Register_MatchesSubfen(ExtensionLoader &loader) {
 	auto matches_subfen_function = ScalarFunction("matches_subfen", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                                              LogicalType::BOOLEAN, MatchesSubfen, MatchesSubfenBindFunction);
-	loader.RegisterFunction(matches_subfen_function);
+	RegisterAixFunction(loader, matches_subfen_function);
 
 	auto matches_subfen_from_fen_function =
 	    ScalarFunction("matches_subfen", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
 	                   LogicalType::BOOLEAN, MatchesSubfenFromFen, MatchesSubfenBindFunction);
-	loader.RegisterFunction(matches_subfen_from_fen_function);
+	RegisterAixFunction(loader, matches_subfen_from_fen_function);
 }
 
 } // namespace duckdb

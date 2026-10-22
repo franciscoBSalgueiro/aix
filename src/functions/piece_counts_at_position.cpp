@@ -17,16 +17,16 @@ struct PieceCountSquares {
 		}
 
 		auto &entries = StructVector::GetEntries(result);
-		FlatVector::GetData<uint8_t>(*entries[0])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_q));
-		FlatVector::GetData<uint8_t>(*entries[1])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_r));
-		FlatVector::GetData<uint8_t>(*entries[2])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_b));
-		FlatVector::GetData<uint8_t>(*entries[3])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_n));
-		FlatVector::GetData<uint8_t>(*entries[4])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_p));
-		FlatVector::GetData<uint8_t>(*entries[5])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_q));
-		FlatVector::GetData<uint8_t>(*entries[6])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_r));
-		FlatVector::GetData<uint8_t>(*entries[7])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_b));
-		FlatVector::GetData<uint8_t>(*entries[8])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_n));
-		FlatVector::GetData<uint8_t>(*entries[9])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_p));
+		FlatVector::GetDataMutable<uint8_t>(entries[0])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_q));
+		FlatVector::GetDataMutable<uint8_t>(entries[1])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_r));
+		FlatVector::GetDataMutable<uint8_t>(entries[2])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_b));
+		FlatVector::GetDataMutable<uint8_t>(entries[3])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_n));
+		FlatVector::GetDataMutable<uint8_t>(entries[4])[i] = static_cast<uint8_t>(bits::popcount(value.bb.w_p));
+		FlatVector::GetDataMutable<uint8_t>(entries[5])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_q));
+		FlatVector::GetDataMutable<uint8_t>(entries[6])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_r));
+		FlatVector::GetDataMutable<uint8_t>(entries[7])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_b));
+		FlatVector::GetDataMutable<uint8_t>(entries[8])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_n));
+		FlatVector::GetDataMutable<uint8_t>(entries[9])[i] = static_cast<uint8_t>(bits::popcount(value.bb.b_p));
 	}
 };
 
@@ -55,7 +55,7 @@ inline void PieceCountsAtPosition(DataChunk &args, ExpressionState &state, Vecto
 inline void PieceCountsAtPositionFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<int32_t> pos_reader;
@@ -111,12 +111,12 @@ void Register_PieceCountsAtPosition(ExtensionLoader &loader) {
 	auto piece_counts_pos_function =
 	    ScalarFunction("piece_counts_at_position", {LogicalType::BLOB, LogicalType::INTEGER},
 	                   LogicalType::STRUCT(piece_counts_children), PieceCountsAtPosition);
-	loader.RegisterFunction(piece_counts_pos_function);
+	RegisterAixFunction(loader, piece_counts_pos_function);
 
 	auto piece_counts_pos_from_fen_function =
 	    ScalarFunction("piece_counts_at_position", {LogicalType::BLOB, LogicalType::INTEGER, LogicalType::VARCHAR},
 	                   LogicalType::STRUCT(piece_counts_children), PieceCountsAtPositionFromFen);
-	loader.RegisterFunction(piece_counts_pos_from_fen_function);
+	RegisterAixFunction(loader, piece_counts_pos_from_fen_function);
 }
 
 } // namespace duckdb

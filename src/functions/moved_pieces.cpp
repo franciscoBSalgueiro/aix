@@ -25,7 +25,7 @@ inline void MovedPiecesList(DataChunk &args, ExpressionState &state, Vector &res
 inline void MovedPiecesListFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
@@ -68,14 +68,14 @@ inline void MovedPieces(DataChunk &args, ExpressionState &state, Vector &result)
 inline void MovedPiecesFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
 	game_reader.Init(args.data[0], count);
 	fen_reader.Init(args.data[1], count);
 
-	auto out = FlatVector::GetData<string_t>(result);
+	auto out = FlatVector::GetDataMutable<string_t>(result);
 	for (idx_t i = 0; i < count; i++) {
 		if (game_reader.IsNull(i)) {
 			validity.SetInvalid(i);
@@ -100,19 +100,19 @@ inline void MovedPiecesFromFen(DataChunk &args, ExpressionState &state, Vector &
 void Register_MovedPieces(ExtensionLoader &loader) {
 	auto moved_pieces_list_function = ScalarFunction("moved_pieces_list", {LogicalType::BLOB},
 	                                                 LogicalType::LIST(LogicalType::VARCHAR), MovedPiecesList);
-	loader.RegisterFunction(moved_pieces_list_function);
+	RegisterAixFunction(loader, moved_pieces_list_function);
 
 	auto moved_pieces_list_from_fen_function =
 	    ScalarFunction("moved_pieces_list", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                   LogicalType::LIST(LogicalType::VARCHAR), MovedPiecesListFromFen);
-	loader.RegisterFunction(moved_pieces_list_from_fen_function);
+	RegisterAixFunction(loader, moved_pieces_list_from_fen_function);
 
 	auto moved_pieces_function = ScalarFunction("moved_pieces", {LogicalType::BLOB}, LogicalType::VARCHAR, MovedPieces);
-	loader.RegisterFunction(moved_pieces_function);
+	RegisterAixFunction(loader, moved_pieces_function);
 
 	auto moved_pieces_from_fen_function =
 	    ScalarFunction("moved_pieces", {LogicalType::BLOB, LogicalType::VARCHAR}, LogicalType::VARCHAR, MovedPiecesFromFen);
-	loader.RegisterFunction(moved_pieces_from_fen_function);
+	RegisterAixFunction(loader, moved_pieces_from_fen_function);
 }
 
 } // namespace duckdb

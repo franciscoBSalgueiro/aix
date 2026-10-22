@@ -47,8 +47,8 @@ static const char *ScoutfishParseErrorToString(ScoutfishQueryParseError err) {
 	}
 }
 
-static unique_ptr<FunctionData> ScoutfishQueryBindFunction(ClientContext &context, ScalarFunction &bound_function,
-                                                           vector<unique_ptr<Expression>> &arguments) {
+static unique_ptr<FunctionData> ScoutfishQueryBindFunction(BindScalarFunctionInput &input) {
+	auto &arguments = input.GetArguments();
 	auto &query_arg = arguments[1];
 	if (query_arg->HasParameter()) {
 		throw ParameterNotResolvedException();
@@ -56,7 +56,7 @@ static unique_ptr<FunctionData> ScoutfishQueryBindFunction(ClientContext &contex
 	if (!query_arg->IsFoldable()) {
 		throw InvalidInputException(*query_arg, "Scoutfish query must be a constant");
 	}
-	Value options_str = ExpressionExecutor::EvaluateScalar(context, *query_arg);
+	Value options_str = input.GetConstant(1);
 	auto scoutfish_query_string = options_str.GetValue<string>();
 
 	bool is_null = options_str.IsNull();
@@ -81,7 +81,7 @@ static unique_ptr<FunctionData> ScoutfishQueryBindFunction(ClientContext &contex
 template <bool PLIES, bool FROM_FEN>
 inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
-	auto &info = func_expr.bind_info->Cast<ScoutfishQueryBindData>();
+	auto &info = func_expr.BindInfo()->Cast<ScoutfishQueryBindData>();
 
 	if (info.is_null) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
@@ -106,13 +106,13 @@ inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &resu
 		});
 	} else if constexpr (!PLIES && FROM_FEN) {
 		result.SetVectorType(VectorType::FLAT_VECTOR);
-		auto &validity = FlatVector::Validity(result);
+		auto &validity = FlatVector::ValidityMutable(result);
 		UnifiedReader<string_t> game_reader;
 		UnifiedReader<string_t> fen_reader;
 		game_reader.Init(args.data[0], count);
 		fen_reader.Init(args.data[2], count);
 
-		auto out = FlatVector::GetData<bool>(result);
+		auto out = FlatVector::GetDataMutable<bool>(result);
 		for (idx_t i = 0; i < count; i++) {
 			if (game_reader.IsNull(i)) {
 				validity.SetInvalid(i);
@@ -173,7 +173,7 @@ inline void ScoutfishQuery(DataChunk &args, ExpressionState &state, Vector &resu
 		    });
 	} else {
 		result.SetVectorType(VectorType::FLAT_VECTOR);
-		auto &validity = FlatVector::Validity(result);
+		auto &validity = FlatVector::ValidityMutable(result);
 		UnifiedReader<string_t> game_reader;
 		UnifiedReader<string_t> fen_reader;
 		game_reader.Init(args.data[0], count);
@@ -242,23 +242,23 @@ void Register_ScoutfishQuery(ExtensionLoader &loader) {
 	auto scoutfish_query_function =
 	    ScalarFunction("scoutfish_query", {LogicalType::BLOB, LogicalType::VARCHAR}, LogicalType::BOOLEAN,
 	                   ScoutfishQuery<false, false>, ScoutfishQueryBindFunction);
-	loader.RegisterFunction(scoutfish_query_function);
+	RegisterAixFunction(loader, scoutfish_query_function);
 
 	auto scoutfish_query_from_fen_function =
 	    ScalarFunction("scoutfish_query", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
 	                   LogicalType::BOOLEAN, ScoutfishQuery<false, true>, ScoutfishQueryBindFunction);
-	loader.RegisterFunction(scoutfish_query_from_fen_function);
+	RegisterAixFunction(loader, scoutfish_query_from_fen_function);
 
 	auto scoutfish_query_plies_function =
 	    ScalarFunction("scoutfish_query_plies", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                   LogicalType::LIST(LogicalType::USMALLINT), ScoutfishQuery<true, false>, ScoutfishQueryBindFunction);
-	loader.RegisterFunction(scoutfish_query_plies_function);
+	RegisterAixFunction(loader, scoutfish_query_plies_function);
 
 	auto scoutfish_query_plies_from_fen_function =
 	    ScalarFunction("scoutfish_query_plies", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
 	                   LogicalType::LIST(LogicalType::USMALLINT), ScoutfishQuery<true, true>,
 	                   ScoutfishQueryBindFunction);
-	loader.RegisterFunction(scoutfish_query_plies_from_fen_function);
+	RegisterAixFunction(loader, scoutfish_query_plies_from_fen_function);
 }
 
 } // namespace duckdb

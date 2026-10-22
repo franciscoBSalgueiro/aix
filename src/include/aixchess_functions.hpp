@@ -21,6 +21,12 @@
 
 namespace duckdb {
 
+inline void RegisterAixFunction(ExtensionLoader &loader, ScalarFunction &function) {
+	function.SetFallible();
+	function.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
+	loader.RegisterFunction(function);
+}
+
 void Register_FenAtPosition(ExtensionLoader &loader);
 void Register_PiecesAtPosition(ExtensionLoader &loader);
 void Register_PieceCountsAtPosition(ExtensionLoader &loader);
@@ -79,7 +85,7 @@ struct UnifiedReader {
 	const T *data = nullptr;
 
 	void Init(Vector &vector, idx_t count) {
-		vector.ToUnifiedFormat(count, format);
+		vector.ToUnifiedFormat(format);
 		data = UnifiedVectorFormat::GetData<T>(format);
 	}
 

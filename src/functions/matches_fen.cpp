@@ -25,8 +25,8 @@ struct MatchesFenBindData : public FunctionData {
 	}
 };
 
-static unique_ptr<FunctionData> MatchesFenBindFunction(ClientContext &context, ScalarFunction &bound_function,
-                                                       vector<unique_ptr<Expression>> &arguments) {
+static unique_ptr<FunctionData> MatchesFenBindFunction(BindScalarFunctionInput &input) {
+	auto &arguments = input.GetArguments();
 	auto &fen_arg = arguments[1];
 	if (fen_arg->HasParameter()) {
 		throw ParameterNotResolvedException();
@@ -34,7 +34,7 @@ static unique_ptr<FunctionData> MatchesFenBindFunction(ClientContext &context, S
 	if (!fen_arg->IsFoldable()) {
 		throw InvalidInputException(*fen_arg, "fen must be a constant");
 	}
-	Value options_str = ExpressionExecutor::EvaluateScalar(context, *fen_arg);
+	Value options_str = input.GetConstant(1);
 	auto fen_string = options_str.GetValue<string>();
 	Fen fen;
 	bool is_null = options_str.IsNull();
@@ -50,7 +50,7 @@ static unique_ptr<FunctionData> MatchesFenBindFunction(ClientContext &context, S
 
 inline void MatchesFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
-	auto &info = func_expr.bind_info->Cast<MatchesFenBindData>();
+	auto &info = func_expr.BindInfo()->Cast<MatchesFenBindData>();
 
 	if (info.is_null) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
@@ -71,7 +71,7 @@ inline void MatchesFen(DataChunk &args, ExpressionState &state, Vector &result) 
 
 inline void MatchesFenPly(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
-	auto &info = func_expr.bind_info->Cast<MatchesFenBindData>();
+	auto &info = func_expr.BindInfo()->Cast<MatchesFenBindData>();
 
 	if (info.is_null) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
@@ -81,24 +81,23 @@ inline void MatchesFenPly(DataChunk &args, ExpressionState &state, Vector &resul
 
 	auto fen = info.fen;
 
-	UnaryExecutor::ExecuteWithNulls<string_t, uint16_t>(args.data[0], result, args.size(),
-	                                                   [&](string_t game, ValidityMask &mask, idx_t idx) {
-		                                                   diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
-		                                                   auto ply_result = fen.matches_fen_ply(data);
-		                                                   auto ply_opt = UnwrapOptionalDecoded<uint16_t>(std::move(ply_result), "matches_fen_ply");
+	UnaryExecutor::Execute<string_t, uint16_t>(
+	    args.data[0], result, args.size(), [&](string_t game) -> optional<uint16_t> {
+		    diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
+		    auto ply_result = fen.matches_fen_ply(data);
+		    auto ply_opt = UnwrapOptionalDecoded<uint16_t>(std::move(ply_result), "matches_fen_ply");
 
-		                                                   if (!ply_opt.has_value()) {
-			                                                   mask.SetInvalid(idx);
-			                                                   return uint16_t(0);
-		                                                   }
+		    if (!ply_opt.has_value()) {
+			    return nullopt;
+		    }
 
-		                                                   return *ply_opt;
-	                                                   });
+		    return *ply_opt;
+	    });
 }
 
 inline void MatchesFenFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
-	auto &info = func_expr.bind_info->Cast<MatchesFenBindData>();
+	auto &info = func_expr.BindInfo()->Cast<MatchesFenBindData>();
 
 	if (info.is_null) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
@@ -110,14 +109,14 @@ inline void MatchesFenFromFen(DataChunk &args, ExpressionState &state, Vector &r
 
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
 	game_reader.Init(args.data[0], count);
 	fen_reader.Init(args.data[2], count);
 
-	auto out = FlatVector::GetData<bool>(result);
+	auto out = FlatVector::GetDataMutable<bool>(result);
 	for (idx_t i = 0; i < count; i++) {
 		if (game_reader.IsNull(i)) {
 			validity.SetInvalid(i);
@@ -139,7 +138,7 @@ inline void MatchesFenFromFen(DataChunk &args, ExpressionState &state, Vector &r
 
 inline void MatchesFenPlyFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
-	auto &info = func_expr.bind_info->Cast<MatchesFenBindData>();
+	auto &info = func_expr.BindInfo()->Cast<MatchesFenBindData>();
 
 	if (info.is_null) {
 		result.SetVectorType(VectorType::CONSTANT_VECTOR);
@@ -151,14 +150,14 @@ inline void MatchesFenPlyFromFen(DataChunk &args, ExpressionState &state, Vector
 
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
 	game_reader.Init(args.data[0], count);
 	fen_reader.Init(args.data[2], count);
 
-	auto out = FlatVector::GetData<uint16_t>(result);
+	auto out = FlatVector::GetDataMutable<uint16_t>(result);
 	for (idx_t i = 0; i < count; i++) {
 		if (game_reader.IsNull(i)) {
 			validity.SetInvalid(i);
@@ -187,8 +186,8 @@ inline void MatchesFenPlyFromFen(DataChunk &args, ExpressionState &state, Vector
 // NULL means absent; '*' means the first matching position ends the game.
 void NextMoveAtFen(DataChunk &args, ExpressionState &state, Vector &result) {
     auto &expr = state.expr.Cast<BoundFunctionExpression>();
-    auto &info = expr.bind_info->Cast<MatchesFenBindData>();
-    if (info.is_null) {
+	auto &info = expr.BindInfo()->Cast<MatchesFenBindData>();
+	if (info.is_null) {
         result.SetVectorType(VectorType::CONSTANT_VECTOR);
         ConstantVector::SetNull(result, true);
         return;
@@ -199,9 +198,9 @@ void NextMoveAtFen(DataChunk &args, ExpressionState &state, Vector &result) {
     const bool has_start = args.ColumnCount() == 3;
     if (has_start) starts.Init(args.data[2], args.size());
     result.SetVectorType(VectorType::FLAT_VECTOR);
-    auto &validity = FlatVector::Validity(result);
-    auto out = FlatVector::GetData<string_t>(result);
-    for (idx_t i = 0; i < args.size(); i++) {
+	auto &validity = FlatVector::ValidityMutable(result);
+	auto out = FlatVector::GetDataMutable<string_t>(result);
+	for (idx_t i = 0; i < args.size(); i++) {
         if (games.IsNull(i)) { validity.SetInvalid(i); continue; }
         auto game = games.Get(i);
         diplomat::span<const uint8_t> data = {const_data_ptr_cast(game.GetData()), game.GetSize()};
@@ -231,27 +230,27 @@ void Register_MatchesFen(ExtensionLoader &loader) {
         if (custom_start) types.push_back(LogicalType::VARCHAR);
         auto function = ScalarFunction("next_move_at_fen", types, LogicalType::VARCHAR,
                                        NextMoveAtFen, MatchesFenBindFunction);
-        function.null_handling = FunctionNullHandling::SPECIAL_HANDLING;
-        loader.RegisterFunction(function);
-    }
+		function.SetNullHandling(FunctionNullHandling::SPECIAL_HANDLING);
+		RegisterAixFunction(loader, function);
+	}
 	auto matches_fen_function = ScalarFunction("matches_fen", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                                           LogicalType::BOOLEAN, MatchesFen, MatchesFenBindFunction);
-	loader.RegisterFunction(matches_fen_function);
+	RegisterAixFunction(loader, matches_fen_function);
 
 	auto matches_fen_from_fen_function =
 	    ScalarFunction("matches_fen", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
 	                   LogicalType::BOOLEAN, MatchesFenFromFen, MatchesFenBindFunction);
-	loader.RegisterFunction(matches_fen_from_fen_function);
+	RegisterAixFunction(loader, matches_fen_from_fen_function);
 
 	auto matches_fen_ply_function = ScalarFunction("matches_fen_ply", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                                               LogicalType::USMALLINT, MatchesFenPly,
 	                                               MatchesFenBindFunction);
-	loader.RegisterFunction(matches_fen_ply_function);
+	RegisterAixFunction(loader, matches_fen_ply_function);
 
 	auto matches_fen_ply_from_fen_function =
 	    ScalarFunction("matches_fen_ply", {LogicalType::BLOB, LogicalType::VARCHAR, LogicalType::VARCHAR},
 	                   LogicalType::USMALLINT, MatchesFenPlyFromFen, MatchesFenBindFunction);
-	loader.RegisterFunction(matches_fen_ply_from_fen_function);
+	RegisterAixFunction(loader, matches_fen_ply_from_fen_function);
 }
 
 } // namespace duckdb

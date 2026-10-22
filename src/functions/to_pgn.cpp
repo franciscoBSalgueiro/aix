@@ -16,14 +16,14 @@ inline void ToPgn(DataChunk &args, ExpressionState &state, Vector &result) {
 inline void ToPgnFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
 	game_reader.Init(args.data[0], count);
 	fen_reader.Init(args.data[1], count);
 
-	auto out = FlatVector::GetData<string_t>(result);
+	auto out = FlatVector::GetDataMutable<string_t>(result);
 	for (idx_t i = 0; i < count; i++) {
 		if (game_reader.IsNull(i)) {
 			validity.SetInvalid(i);
@@ -47,11 +47,11 @@ inline void ToPgnFromFen(DataChunk &args, ExpressionState &state, Vector &result
 
 void Register_ToPgn(ExtensionLoader &loader) {
 	auto to_pgn_function = ScalarFunction("to_pgn", {LogicalType::BLOB}, LogicalType::VARCHAR, ToPgn);
-	loader.RegisterFunction(to_pgn_function);
+	RegisterAixFunction(loader, to_pgn_function);
 
 	auto to_pgn_from_fen_function =
 	    ScalarFunction("to_pgn", {LogicalType::BLOB, LogicalType::VARCHAR}, LogicalType::VARCHAR, ToPgnFromFen);
-	loader.RegisterFunction(to_pgn_from_fen_function);
+	RegisterAixFunction(loader, to_pgn_from_fen_function);
 }
 
 } // namespace duckdb

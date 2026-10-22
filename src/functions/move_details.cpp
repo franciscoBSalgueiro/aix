@@ -38,21 +38,21 @@ struct MoveDetailsStruct {
 
 		auto &entries = StructVector::GetEntries(result);
 
-		FlatVector::GetData<uint16_t>(*entries[PLY_I])[i] = value.inner.ply;
-		FlatVector::GetData<string_t>(*entries[ROLE_I])[i] = std::string(1, value.inner.role);
-		FlatVector::GetData<string_t>(*entries[FROM_I])[i] = SQUARES[value.inner.from];
-		FlatVector::GetData<string_t>(*entries[TO_I])[i] = SQUARES[value.inner.to];
-		FlatVector::GetData<string_t>(*entries[PROMOTION_I])[i] =
+		FlatVector::GetDataMutable<uint16_t>(entries[PLY_I])[i] = value.inner.ply;
+		FlatVector::GetDataMutable<string_t>(entries[ROLE_I])[i] = std::string(1, value.inner.role);
+		FlatVector::GetDataMutable<string_t>(entries[FROM_I])[i] = SQUARES[value.inner.from];
+		FlatVector::GetDataMutable<string_t>(entries[TO_I])[i] = SQUARES[value.inner.to];
+		FlatVector::GetDataMutable<string_t>(entries[PROMOTION_I])[i] =
 		    value.inner.promotion == 0 ? "" : std::string(1, value.inner.promotion);
-		FlatVector::GetData<string_t>(*entries[CAPTURE_I])[i] =
+		FlatVector::GetDataMutable<string_t>(entries[CAPTURE_I])[i] =
 		    value.inner.capture == 0 ? "" : std::string(1, value.inner.capture);
-		FlatVector::GetData<bool>(*entries[IS_CASTLE_I])[i] = value.inner.is_castle;
-		FlatVector::GetData<bool>(*entries[IS_EN_PASSANT_I])[i] = value.inner.is_en_passant;
-		FlatVector::GetData<bool>(*entries[CHECK_I])[i] = value.inner.is_check;
-		FlatVector::GetData<bool>(*entries[CHECKMATE_I])[i] = value.inner.is_checkmate;
+		FlatVector::GetDataMutable<bool>(entries[IS_CASTLE_I])[i] = value.inner.is_castle;
+		FlatVector::GetDataMutable<bool>(entries[IS_EN_PASSANT_I])[i] = value.inner.is_en_passant;
+		FlatVector::GetDataMutable<bool>(entries[CHECK_I])[i] = value.inner.is_check;
+		FlatVector::GetDataMutable<bool>(entries[CHECKMATE_I])[i] = value.inner.is_checkmate;
 		if constexpr (std::is_same_v<INNER_TYPE, MoveDetailsExtended>) {
-			FlatVector::GetData<bool>(*entries[STALEMATE_I])[i] = value.inner.is_stalemate;
-			FlatVector::GetData<uint8_t>(*entries[LEGAL_RESPONSE_MOVE_COUNT_I])[i] =
+			FlatVector::GetDataMutable<bool>(entries[STALEMATE_I])[i] = value.inner.is_stalemate;
+			FlatVector::GetDataMutable<uint8_t>(entries[LEGAL_RESPONSE_MOVE_COUNT_I])[i] =
 			    value.inner.legal_response_move_count;
 		}
 	}
@@ -84,7 +84,7 @@ inline void MoveDetailsExtFromFenFn(DataChunk &args, ExpressionState &state, Vec
 	const char *func_name = "move_details_ext";
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
@@ -144,7 +144,7 @@ inline void MoveDetailsFromFenFn(DataChunk &args, ExpressionState &state, Vector
 	const char *func_name = "move_details";
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
@@ -207,7 +207,7 @@ inline void MoveDetailsExtAtFromFenFn(DataChunk &args, ExpressionState &state, V
 	const char *func_name = "move_details_ext_at";
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<int16_t> ply_reader;
@@ -276,7 +276,7 @@ inline void MoveDetailsAtFromFenFn(DataChunk &args, ExpressionState &state, Vect
 	const char *func_name = "move_details_at";
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<int16_t> ply_reader;
@@ -349,40 +349,40 @@ void Register_MoveDetails(ExtensionLoader &loader) {
 	auto move_details_ext_function =
 	    ScalarFunction("move_details_ext", {LogicalType::BLOB},
 	                   LogicalType::LIST(LogicalType::STRUCT(move_children_ext)), MoveDetailsExtFn);
-	loader.RegisterFunction(move_details_ext_function);
+	RegisterAixFunction(loader, move_details_ext_function);
 
 	auto move_details_ext_from_fen_function =
 	    ScalarFunction("move_details_ext", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                   LogicalType::LIST(LogicalType::STRUCT(move_children_ext)), MoveDetailsExtFromFenFn);
-	loader.RegisterFunction(move_details_ext_from_fen_function);
+	RegisterAixFunction(loader, move_details_ext_from_fen_function);
 
 	auto move_details_ext_at_function =
 	    ScalarFunction("move_details_ext_at", {LogicalType::BLOB, LogicalType::SMALLINT},
 	                   LogicalType::STRUCT(move_children_ext), MoveDetailsExtAtFn);
-	loader.RegisterFunction(move_details_ext_at_function);
+	RegisterAixFunction(loader, move_details_ext_at_function);
 
 	auto move_details_ext_at_from_fen_function =
 	    ScalarFunction("move_details_ext_at", {LogicalType::BLOB, LogicalType::SMALLINT, LogicalType::VARCHAR},
 	                   LogicalType::STRUCT(move_children_ext), MoveDetailsExtAtFromFenFn);
-	loader.RegisterFunction(move_details_ext_at_from_fen_function);
+	RegisterAixFunction(loader, move_details_ext_at_from_fen_function);
 
 	auto move_details_function = ScalarFunction("move_details", {LogicalType::BLOB},
 	                                            LogicalType::LIST(LogicalType::STRUCT(move_children)), MoveDetailsFn);
-	loader.RegisterFunction(move_details_function);
+	RegisterAixFunction(loader, move_details_function);
 
 	auto move_details_from_fen_function =
 	    ScalarFunction("move_details", {LogicalType::BLOB, LogicalType::VARCHAR},
 	                   LogicalType::LIST(LogicalType::STRUCT(move_children)), MoveDetailsFromFenFn);
-	loader.RegisterFunction(move_details_from_fen_function);
+	RegisterAixFunction(loader, move_details_from_fen_function);
 
 	auto move_details_at_function = ScalarFunction("move_details_at", {LogicalType::BLOB, LogicalType::SMALLINT},
 	                                               LogicalType::STRUCT(move_children), MoveDetailsAtFn);
-	loader.RegisterFunction(move_details_at_function);
+	RegisterAixFunction(loader, move_details_at_function);
 
 	auto move_details_at_from_fen_function =
 	    ScalarFunction("move_details_at", {LogicalType::BLOB, LogicalType::SMALLINT, LogicalType::VARCHAR},
 	                   LogicalType::STRUCT(move_children), MoveDetailsAtFromFenFn);
-	loader.RegisterFunction(move_details_at_from_fen_function);
+	RegisterAixFunction(loader, move_details_at_from_fen_function);
 }
 
 } // namespace duckdb

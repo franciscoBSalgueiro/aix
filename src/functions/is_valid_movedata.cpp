@@ -14,14 +14,14 @@ inline void IsValidMovedata(DataChunk &args, ExpressionState &state, Vector &res
 inline void IsValidMovedataFromFen(DataChunk &args, ExpressionState &state, Vector &result) {
 	auto count = args.size();
 	result.SetVectorType(VectorType::FLAT_VECTOR);
-	auto &validity = FlatVector::Validity(result);
+	auto &validity = FlatVector::ValidityMutable(result);
 
 	UnifiedReader<string_t> game_reader;
 	UnifiedReader<string_t> fen_reader;
 	game_reader.Init(args.data[0], count);
 	fen_reader.Init(args.data[1], count);
 
-	auto out = FlatVector::GetData<bool>(result);
+	auto out = FlatVector::GetDataMutable<bool>(result);
 	for (idx_t i = 0; i < count; i++) {
 		if (game_reader.IsNull(i)) {
 			validity.SetInvalid(i);
@@ -44,11 +44,11 @@ inline void IsValidMovedataFromFen(DataChunk &args, ExpressionState &state, Vect
 
 void Register_IsValidMovedata(ExtensionLoader &loader) {
 	auto is_valid_movedata_function = ScalarFunction("is_valid_movedata", {LogicalType::BLOB}, LogicalType::BOOLEAN, IsValidMovedata);
-	loader.RegisterFunction(is_valid_movedata_function);
+	RegisterAixFunction(loader, is_valid_movedata_function);
 
 	auto is_valid_movedata_from_fen_function =
 	    ScalarFunction("is_valid_movedata", {LogicalType::BLOB, LogicalType::VARCHAR}, LogicalType::BOOLEAN, IsValidMovedataFromFen);
-	loader.RegisterFunction(is_valid_movedata_from_fen_function);
+	RegisterAixFunction(loader, is_valid_movedata_from_fen_function);
 }
 
 } // namespace duckdb
